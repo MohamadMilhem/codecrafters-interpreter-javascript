@@ -29,6 +29,12 @@ if (fileContent.length !== 0) {
       else if (line[j] === '('){
         console.log("LEFT_PAREN ( null");
       }
+      else if (line[j] === '}'){
+        console.log("RIGHT_BRACE } null");
+      }
+      else if (line[j] === '{'){
+        console.log("LEFT_BRACE { null");
+      }
     }
   }
   console.log("EOF  null");
