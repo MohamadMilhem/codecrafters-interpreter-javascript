@@ -4,30 +4,21 @@ import { error } from "./logger.js";
 
 const tokens = []
 export let errorsCount = 0;
-let skipNext = false;
-let lines, lineNumber, curr_line, characterNumber;
-let comment = false;
-
+let skipNext = false, comment = false;
+let lineNumber = 1, curr_char = 0;
+let fileLength = 0;
+let file;
 export function tokenizeCommand(fileContent) {
-    lines = fileContent.split("\n");
-    lineNumber = 0;
+    fileLength = fileContent.length;
+    file = fileContent;
 
-    for (curr_line of lines) {
-        lineNumber++;
-        characterNumber = -1;
-        for (let character of curr_line) {
-            characterNumber++;
-            if (skipNext){
-                skipNext = false;
-                continue;
-            }
-            checkCharacter(character, lineNumber);
-            if (comment){
-                skipNext = false;
-                comment = false;
-                break;
-            }
+    for (curr_char = 0; curr_char < fileLength; curr_char++) {
+        if (skipNext){
+            skipNext = false;
+            continue;
         }
+        if (comment && fileContent[curr_char] !== '\n')continue;
+        checkCharacter(fileContent[curr_char]);
     }
 
     addToken(tokenType.EOF);
@@ -35,7 +26,7 @@ export function tokenizeCommand(fileContent) {
     return tokens;
 }
 
-function checkCharacter(character, lineNumber) {
+function checkCharacter(character) {
     switch (character) {
         case '(':
             addToken(tokenType.LEFT_PAREN, character);
@@ -89,9 +80,15 @@ function checkCharacter(character, lineNumber) {
                 break;
             }
             addToken(tokenType.SLASH, character);
+            break;
+        case '"':
+            getString();
+            break;
         case ' ':
             break;
         case '\n':
+            lineNumber++;
+            comment = false;
             break;
         case '\r':
             break;
@@ -104,15 +101,39 @@ function checkCharacter(character, lineNumber) {
     }
 }
 
+function getString() {
+    let chars_in_string = [];
+    chars_in_string.push(file[curr_char]);
+    curr_char++;
+    while(curr_char < fileLength && file[curr_char] !== '"'){
+        chars_in_string.push(file[curr_char]);
+        if (file[curr_char] === '\n')
+            lineNumber++;
+        curr_char++;
+    }
+
+    if (curr_char === fileLength) {
+        error(lineNumber, errorType.UNTERMINATED_STRING);
+        errorsCount++;
+        return;
+    }
+
+    chars_in_string.push(file[curr_char]);
+    let nameOfText = chars_in_string.join('');
+    let valueOfText = nameOfText.substring(1 ,nameOfText.length - 1);
+    addToken(tokenType.STRING, nameOfText, valueOfText);
+}
+
+
 function match(expected) {
-    if (curr_line.length === characterNumber +  1)return false;
-    if (curr_line[characterNumber + 1] !== expected)return false;
+    if (fileLength === curr_char +  1)return false;
+    if (file[curr_char + 1] !== expected)return false;
 
     skipNext = true;
     return true;
 }
 
 
-function addToken(tokenType, text="") {
-    tokens.push({type: tokenType, text: text, value: null});
+function addToken(tokenType, text="", value=null) {
+    tokens.push({type: tokenType, text: text, value: value});
 }

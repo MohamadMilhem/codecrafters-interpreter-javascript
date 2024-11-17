@@ -18,5 +18,6 @@ export const tokenType = Object.freeze({
     GREATER: 'GREATER',
     SLASH: 'SLASH',
     BANG: 'BANG',
+    STRING: 'STRING',
     EOF: 'EOF',
 })
