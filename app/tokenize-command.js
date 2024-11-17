@@ -4,14 +4,22 @@ import { error } from "./logger.js";
 
 const tokens = []
 export let errorsCount = 0;
+let skipNext = false;
+let lines, lineNumber, curr_line, characterNumber;
 
 export function tokenizeCommand(fileContent) {
-    let lines = fileContent.split("\n");
-    let lineNumber = 0;
+    lines = fileContent.split("\n");
+    lineNumber = 0;
 
-    for (let curr_line of lines) {
+    for (curr_line of lines) {
         lineNumber++;
+        characterNumber = -1;
         for (let character of curr_line) {
+            characterNumber++;
+            if (skipNext){
+                skipNext = false;
+                continue;
+            }
             checkCharacter(character, lineNumber);
         }
     }
@@ -53,6 +61,22 @@ function checkCharacter(character, lineNumber) {
         case '*':
             addToken(tokenType.STAR, character);
             break;
+        case '!':
+            addToken(match('=') ? tokenType.BANG_EQUAL : tokenType.BANG,
+                character + (match('=') ? '=' : ''));
+            break;
+        case '=':
+            addToken(match('=') ? tokenType.EQUAL_EQUAL : tokenType.EQUAL,
+                character + (match('=') ? '=' : ''));
+            break;
+        case '<':
+            addToken(match('=') ? tokenType.LESS_EQUAL : tokenType.LESS,
+                character + (match('=') ? '=' : ''));
+            break;
+        case '>':
+            addToken(match('=') ? tokenType.GREATER_EQUAL : tokenType.GREATER,
+                character + (match('=') ? '=' : ''));
+            break;
         case ' ':
             break;
         case '\n':
@@ -65,6 +89,15 @@ function checkCharacter(character, lineNumber) {
             break;
     }
 }
+
+function match(expected) {
+    if (curr_line.length === characterNumber +  1)return false;
+    if (curr_line[characterNumber + 1] !== expected)return false;
+
+    skipNext = true;
+    return true;
+}
+
 
 function addToken(tokenType, text="") {
     tokens.push({type: tokenType, text: text, value: null});
