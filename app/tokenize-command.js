@@ -91,6 +91,8 @@ function checkCharacter(character, lineNumber) {
             break;
         case '\r':
             break;
+        case '\t':
+            break;
         default:
             error(lineNumber, errorType.UNEXPECTED_CHAR, character);
             errorsCount++;
