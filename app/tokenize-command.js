@@ -22,7 +22,11 @@ export function tokenizeCommand(fileContent) {
                 continue;
             }
             checkCharacter(character, lineNumber);
-            if (comment) break;
+            if (comment){
+                skipNext = false;
+                comment = false;
+                break;
+            }
         }
     }
 
