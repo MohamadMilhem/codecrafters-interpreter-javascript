@@ -1,12 +1,18 @@
-import { tokenType } from './tokenType.js';
+import { tokenType } from './token-type.js';
+import { errorType } from "./error-type.js";
+import { error } from "./logger.js";
+
 const tokens = []
+export let errorsCount = 0;
 
 export function tokenizeCommand(fileContent) {
     let lines = fileContent.split("\n");
+    let lineNumber = 0;
 
     for (let curr_line of lines) {
+        lineNumber++;
         for (let character of curr_line) {
-            checkCharacter(character, curr_line);
+            checkCharacter(character, lineNumber);
         }
     }
 
@@ -15,7 +21,7 @@ export function tokenizeCommand(fileContent) {
     return tokens;
 }
 
-function checkCharacter(character, curr_line) {
+function checkCharacter(character, lineNumber) {
     switch (character) {
         case '(':
             addToken(tokenType.LEFT_PAREN, character);
@@ -47,8 +53,15 @@ function checkCharacter(character, curr_line) {
         case '*':
             addToken(tokenType.STAR, character);
             break;
+        case ' ':
+            break;
+        case '\n':
+            break;
+        case '\r':
+            break;
         default:
-            console.log("Line: " + curr_line + "\n" + "Unexpected character: " + character);
+            error(lineNumber, errorType.UNEXPECTED_CHAR, character);
+            errorsCount++;
             break;
     }
 }

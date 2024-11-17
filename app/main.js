@@ -1,5 +1,5 @@
 import fs from "fs";
-import { tokenizeCommand } from "./tokenize-command.js"
+import { tokenizeCommand, errorsCount } from "./tokenize-command.js"
 
 const args = process.argv.slice(2); // Skip the first two arguments (node path and script path)
 
@@ -22,4 +22,8 @@ const tokens = tokenizeCommand(fileContent);
 
 for (let token of tokens) {
   console.log(token.type.toString() + " " + token.text + " " + token.value);
+}
+
+if (errorsCount > 0) {
+  process.exit(65);
 }
