@@ -21,7 +21,7 @@ const fileContent = fs.readFileSync(filename, "utf8");
 const tokens = tokenizeCommand(fileContent);
 
 for (let token of tokens) {
-  console.log(token.type.toString() + " " + token.text + " " + token.value);
+  console.log(token.type + " " + token.text + " " + token.value);
 }
 
 if (errorsCount > 0) {

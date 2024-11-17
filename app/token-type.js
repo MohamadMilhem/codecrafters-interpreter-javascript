@@ -15,7 +15,7 @@ export const tokenType = Object.freeze({
     LESS_EQUAL: 'LESS_EQUAL',
     GREATER_EQUAL: 'GREATER_EQUAL',
     LESS: 'LESS',
-    GRATER: 'GRATER',
+    GREATER: 'GREATER',
     SLASH: 'SLASH',
     BANG: 'BANG',
     EOF: 'EOF',
