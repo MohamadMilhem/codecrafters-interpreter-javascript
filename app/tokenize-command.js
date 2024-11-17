@@ -6,6 +6,7 @@ const tokens = []
 export let errorsCount = 0;
 let skipNext = false;
 let lines, lineNumber, curr_line, characterNumber;
+let comment = false;
 
 export function tokenizeCommand(fileContent) {
     lines = fileContent.split("\n");
@@ -21,6 +22,7 @@ export function tokenizeCommand(fileContent) {
                 continue;
             }
             checkCharacter(character, lineNumber);
+            if (comment) break;
         }
     }
 
@@ -77,6 +79,12 @@ function checkCharacter(character, lineNumber) {
             addToken(match('=') ? tokenType.GREATER_EQUAL : tokenType.GREATER,
                 character + (match('=') ? '=' : ''));
             break;
+        case '/':
+            if (match('/')){
+                comment = true;
+                break;
+            }
+            addToken(tokenType.SLASH, character);
         case ' ':
             break;
         case '\n':
