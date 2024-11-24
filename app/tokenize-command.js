@@ -5,20 +5,20 @@ import { error } from "./logger.js";
 const tokens = []
 export let errorsCount = 0;
 let skipNext = false, comment = false;
-let lineNumber = 1, curr_char = 0;
+let lineNumber = 1, curr_char_idx = 0;
 let fileLength = 0;
 let file;
 export function tokenizeCommand(fileContent) {
     fileLength = fileContent.length;
     file = fileContent;
 
-    for (curr_char = 0; curr_char < fileLength; curr_char++) {
+    for (curr_char_idx = 0; curr_char_idx < fileLength; curr_char_idx++) {
         if (skipNext){
             skipNext = false;
             continue;
         }
-        if (comment && fileContent[curr_char] !== '\n')continue;
-        checkCharacter(fileContent[curr_char]);
+        if (comment && fileContent[curr_char_idx] !== '\n')continue;
+        checkCharacter(fileContent[curr_char_idx]);
     }
 
     addToken(tokenType.EOF);
@@ -95,30 +95,64 @@ function checkCharacter(character) {
         case '\t':
             break;
         default:
-            error(lineNumber, errorType.UNEXPECTED_CHAR, character);
-            errorsCount++;
+            if (isDigit(character)){
+                getNumberIntegerPart();
+            }
+            else {
+                error(lineNumber, errorType.UNEXPECTED_CHAR, character);
+                errorsCount++;
+            }
             break;
     }
 }
 
-function getString() {
-    let chars_in_string = [];
-    chars_in_string.push(file[curr_char]);
-    curr_char++;
-    while(curr_char < fileLength && file[curr_char] !== '"'){
-        chars_in_string.push(file[curr_char]);
-        if (file[curr_char] === '\n')
-            lineNumber++;
-        curr_char++;
+function isDigit(char) {
+    return char >= '0' && char <= '9';
+}
+
+
+function getNumberIntegerPart(){
+    let number_digits = [];
+    number_digits.push(getCurrentChar());
+    while(isDigit(getNextChar())){
+        moveToNextChar()
+        number_digits.push(getCurrentChar());
     }
 
-    if (curr_char === fileLength) {
+    if (getNextChar() === '.') {
+        moveToNextChar();
+        number_digits.push(getCurrentChar());
+        while(isDigit(getNextChar())){
+            moveToNextChar();
+            number_digits.push(getCurrentChar());
+        }
+    }
+
+    let lexeme = number_digits.join('');
+    let literal = parseFloat(lexeme);
+
+    addToken(tokenType.NUMBER, lexeme, literal);
+
+}
+
+function getString() {
+    let chars_in_string = [];
+    chars_in_string.push(getCurrentChar());
+    moveToNextChar();
+    while(curr_char_idx < fileLength && getCurrentChar() !== '"'){
+        chars_in_string.push(getCurrentChar());
+        if (getCurrentChar() === '\n')
+            lineNumber++;
+        moveToNextChar();
+    }
+
+    if (curr_char_idx === fileLength) {
         error(lineNumber, errorType.UNTERMINATED_STRING);
         errorsCount++;
         return;
     }
 
-    chars_in_string.push(file[curr_char]);
+    chars_in_string.push(getCurrentChar());
     let nameOfText = chars_in_string.join('');
     let valueOfText = nameOfText.substring(1 ,nameOfText.length - 1);
     addToken(tokenType.STRING, nameOfText, valueOfText);
@@ -126,9 +160,7 @@ function getString() {
 
 
 function match(expected) {
-    if (fileLength === curr_char +  1)return false;
-    if (file[curr_char + 1] !== expected)return false;
-
+    if (getNextChar() !== expected) return false;
     skipNext = true;
     return true;
 }
@@ -136,4 +168,19 @@ function match(expected) {
 
 function addToken(tokenType, text="", value=null) {
     tokens.push({type: tokenType, text: text, value: value});
+}
+
+
+function getCurrentChar(){
+    if (curr_char_idx >= file.length) return '\0';
+    return file[curr_char_idx];
+}
+
+function getNextChar(){
+    if (curr_char_idx + 1 >= file.length) return '\0';
+    return file[curr_char_idx + 1];
+}
+
+function moveToNextChar(){
+    curr_char_idx++;
 }

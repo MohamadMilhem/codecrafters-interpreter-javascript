@@ -1,5 +1,7 @@
 import fs from "fs";
 import { tokenizeCommand, errorsCount } from "./tokenize-command.js"
+import {tokenType} from "./token-type.js";
+import {printNumbers} from "./logger.js";
 
 const args = process.argv.slice(2); // Skip the first two arguments (node path and script path)
 
@@ -21,6 +23,10 @@ const fileContent = fs.readFileSync(filename, "utf8");
 const tokens = tokenizeCommand(fileContent);
 
 for (let token of tokens) {
+  if (token.type === tokenType.NUMBER) {
+    printNumbers(token);
+    continue;
+  }
   console.log(token.type + " " + token.text + " " + token.value);
 }
 

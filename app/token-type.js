@@ -19,5 +19,6 @@ export const tokenType = Object.freeze({
     SLASH: 'SLASH',
     BANG: 'BANG',
     STRING: 'STRING',
+    NUMBER: 'NUMBER',
     EOF: 'EOF',
 })
