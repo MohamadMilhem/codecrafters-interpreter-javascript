@@ -1,6 +1,7 @@
 import { tokenType } from './token-type.js';
 import { errorType } from "./error-type.js";
 import { error } from "./logger.js";
+import {keywords} from "./keywords.js";
 
 const tokens = []
 export let errorsCount = 0;
@@ -96,7 +97,10 @@ function checkCharacter(character) {
             break;
         default:
             if (isDigit(character)){
-                getNumberIntegerPart();
+                getNumber();
+            }
+            else if (isAlpha(character)){
+                getIdentifier();
             }
             else {
                 error(lineNumber, errorType.UNEXPECTED_CHAR, character);
@@ -110,8 +114,33 @@ function isDigit(char) {
     return char >= '0' && char <= '9';
 }
 
+function isAlpha(char) {
+    return (char >= 'a' && char <= 'z')
+        || (char >= 'A' && char <= 'Z')
+        || (char === '_');
+}
 
-function getNumberIntegerPart(){
+function isAlphaNumeric(char) {
+    return isDigit(char) || isAlpha(char);
+}
+
+function getIdentifier() {
+    let identifier_chars = [];
+    identifier_chars.push(getCurrentChar());
+    while(isAlphaNumeric(getNextChar())){
+        moveToNextChar();
+        identifier_chars.push(getCurrentChar());
+    }
+
+    let text = identifier_chars.join('');
+    let current_tokenType = keywords.get(text);
+    if (current_tokenType === undefined) {
+        current_tokenType = tokenType.IDENTIFIER;
+    }
+    addToken(current_tokenType, text);
+}
+
+function getNumber(){
     let number_digits = [];
     number_digits.push(getCurrentChar());
     while(isDigit(getNextChar())){
