@@ -154,7 +154,7 @@ function primary(curr_idx){
         let {expr, curr_idx: next_idx} = expression(curr_idx);
         curr_idx = next_idx;
         curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after expression.", curr_idx);
-        let returnResult = {
+        expr = {
             name: "grouping",
             expression: expr
         };
