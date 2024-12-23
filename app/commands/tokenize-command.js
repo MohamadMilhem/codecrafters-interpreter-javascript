@@ -1,7 +1,7 @@
-import { tokenType } from './token-type.js';
-import { errorType } from "./error-type.js";
-import { error } from "./logger.js";
-import {keywords} from "./keywords.js";
+import { tokenType } from '../constants/token-type.js';
+import { errorType } from "../constants/error-type.js";
+import { error } from "../utils/logger.js";
+import {keywords} from "../constants/keywords.js";
 
 const tokens = []
 export let errorsCount = 0;
