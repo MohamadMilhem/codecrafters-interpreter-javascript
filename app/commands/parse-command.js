@@ -102,6 +102,7 @@ function unary(curr_idx) {
         curr_idx++;
         const operator = previous(curr_idx);
         let {expr: right, curr_idx: new_idx} = unary(curr_idx);
+        curr_idx = new_idx;
         let expr = {
             name: "unary",
             operator: operator,
