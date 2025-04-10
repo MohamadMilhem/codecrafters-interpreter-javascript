@@ -2,9 +2,10 @@ import { tokenType } from '../constants/token-type.js';
 import { errorType } from "../constants/error-type.js";
 import { error } from "../utils/logger.js";
 import {keywords} from "../constants/keywords.js";
+import {TokenizationError} from "../utils/error-handler.js";
 
 const tokens = []
-export let errorsCount = 0;
+export let errorsCountTokenize = 0;
 let skipNext = false, comment = false;
 let lineNumber = 1, curr_char_idx = 0;
 let fileLength = 0;
@@ -104,7 +105,8 @@ function checkCharacter(character) {
             }
             else {
                 error(lineNumber, errorType.UNEXPECTED_CHAR, character);
-                errorsCount++;
+                errorsCountTokenize++;
+                return;
             }
             break;
     }
@@ -177,7 +179,7 @@ function getString() {
 
     if (curr_char_idx === fileLength) {
         error(lineNumber, errorType.UNTERMINATED_STRING);
-        errorsCount++;
+        errorsCountTokenize++;
         return;
     }
 
@@ -196,7 +198,7 @@ function match(expected) {
 
 
 function addToken(tokenType, text="", value=null) {
-    tokens.push({type: tokenType, text: text, value: value});
+    tokens.push({type: tokenType, text: text, value: value, line: lineNumber});
 }
 
 

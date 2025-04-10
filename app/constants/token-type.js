@@ -22,6 +22,7 @@ export const tokenType = Object.freeze({
     NUMBER: 'NUMBER',
     AND: 'AND',
     CLASS: 'CLASS',
+    FUNCTION: 'FUNCTION',
     ELSE: 'ELSE',
     FALSE: 'FALSE',
     FOR: 'FOR',
