@@ -5,10 +5,11 @@ import {astPrint} from "./utils/ast-printer.js";
 import {errorsCountParse, parseCommand} from "./commands/parse-command.js";
 import {ParseError, TokenizationError} from "./utils/error-handler.js";
 import {commands} from "./constants/commands.js";
+import {evaluateCommand} from "./commands/evaluate-command.js";
 
 const args = process.argv.slice(2); // Skip the first two arguments (node path and script path)
 
-//let args = ["parse", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+//let args = ["evaluate", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
 
 
 if (args.length < 2) {
@@ -57,6 +58,13 @@ if (command === commands.PARSE){
 
     process.exit(65);  // Different exit code for runtime errors
   }
+}
+
+
+if (command === commands.EVALUATE){
+  let evaluateResult = evaluateCommand(fileContent);
+  console.log(evaluateResult === null ? "nil" : evaluateResult);
+  process.exit(0);
 }
 
 

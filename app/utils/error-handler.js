@@ -13,3 +13,12 @@ export class TokenizationError extends Error {
         this.name = "TokenizationError";
     }
 }
+
+// change this to run time error?
+export class EvaluationError extends Error {
+    constructor(line, message) {
+        super(message);
+        this.line = line;
+        this.name = "EvaluationError";
+    }
+}
