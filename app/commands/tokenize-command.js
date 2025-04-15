@@ -3,6 +3,7 @@ import { errorType } from "../constants/error-type.js";
 import { error } from "../utils/logger.js";
 import {keywords} from "../constants/keywords.js";
 import {TokenizationError} from "../utils/error-handler.js";
+import {errorsCountParse} from "./parse-command.js";
 
 const tokens = []
 export let errorsCountTokenize = 0;
@@ -25,7 +26,11 @@ export function tokenizeCommand(fileContent) {
 
     addToken(tokenType.EOF);
 
-    return tokens;
+    return {
+        tokens: tokens,
+        hasErrors: errorsCountTokenize > 0,
+        errorCount: errorsCountTokenize,
+    };
 }
 
 function checkCharacter(character) {

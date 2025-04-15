@@ -7,14 +7,15 @@ export let errorsCountParse = 0;
 let tokens = [];
 
 export function parseCommand(fileContent) {
-    errorsCountParse = 0;
-    tokens = tokenizeCommand(fileContent);
-
-    if (tokens[0].type === tokenType.EOF || errorsCountTokenize > 0) {
-        return;
-    }
-
     try {
+        const tokenizeResult = tokenizeCommand(fileContent);
+
+        if (tokenizeResult.hasErrors){
+            // report by the tokenizer.
+            process.exit(65);
+        }
+        tokens = tokenizeResult.tokens;
+
         const result = expression(0);
 
         if (!isAtEnd(result.curr_idx)){
