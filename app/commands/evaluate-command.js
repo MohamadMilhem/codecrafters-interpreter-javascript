@@ -44,12 +44,22 @@ function evaluatingLiterals(literalExpr) {
 function evaluatingUnaryExpr(unaryExpr) {
     let right = evaluate(unaryExpr.expression);
 
-    switch (right.operator.type) {
+    switch (unaryExpr.operator.type) {
+        case tokenType.BANG:
+            return !isTruthy(right);
         case tokenType.MINUS:
             return -right;
     }
     // unreachable (maybe return the same right).
     return right;
+}
+
+function isTruthy(expression) {
+    if (expression === null)
+        return false;
+    if (typeof expression === "boolean")
+        return expression;
+    return true;
 }
 
 function evaluatingGrouping(groupingExpr) {
