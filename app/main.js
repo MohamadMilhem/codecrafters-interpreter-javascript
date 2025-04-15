@@ -7,9 +7,9 @@ import {ParseError, TokenizationError} from "./utils/error-handler.js";
 import {commands} from "./constants/commands.js";
 import {evaluateCommand} from "./commands/evaluate-command.js";
 
-//const args = process.argv.slice(2); // Skip the first two arguments (node path and script path)
+const args = process.argv.slice(2); // Skip the first two arguments (node path and script path)
 
-let args = ["evaluate", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+//let args = ["evaluate", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
 
 
 if (args.length < 2) {

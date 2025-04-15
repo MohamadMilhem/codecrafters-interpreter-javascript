@@ -30,6 +30,8 @@ function evaluate(expr) {
             return evaluatingUnaryExpr(expr);
         case "grouping":
             return evaluatingGrouping(expr);
+        case "binary":
+            return evaluatingBinaryExpr(expr);
         default:
             return null;
     }
@@ -66,3 +68,18 @@ function evaluatingGrouping(groupingExpr) {
     return evaluate(groupingExpr.expression);
 }
 
+function evaluatingBinaryExpr(binaryExpr) {
+    let right = evaluate(binaryExpr.rightExpression);
+    let left = evaluate(binaryExpr.leftExpression);
+
+    switch (binaryExpr.operator.type) {
+        case tokenType.MINUS:
+            return left - right;
+        case tokenType.SLASH:
+            return left / right;
+        case tokenType.STAR:
+            return left * right;
+    }
+
+    return null;
+}
