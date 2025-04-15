@@ -9,7 +9,7 @@ import {evaluateCommand} from "./commands/evaluate-command.js";
 
 const args = process.argv.slice(2); // Skip the first two arguments (node path and script path)
 
-//let args = ["evaluate", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+//let args = ["tokenize", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
 
 
 if (args.length < 2) {
@@ -23,9 +23,9 @@ const fileContent = fs.readFileSync(filename, "utf8");
 
 if (command === commands.TOKENIZE) {
   try {
-    const tokens = tokenizeCommand(fileContent);
-    printTokens(tokens);
-    if (errorsCountTokenize > 0){
+    const tokenizeResult = tokenizeCommand(fileContent);
+    printTokens(tokenizeResult.tokens);
+    if (tokenizeResult.hasErrors){
       process.exit(65);
     }
     process.exit(0);
