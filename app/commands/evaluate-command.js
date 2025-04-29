@@ -75,6 +75,8 @@ function evaluatingBinaryExpr(binaryExpr) {
     switch (binaryExpr.operator.type) {
         case tokenType.MINUS:
             return left - right;
+        case tokenType.PLUS:
+            return left + right;
         case tokenType.SLASH:
             return left / right;
         case tokenType.STAR:
