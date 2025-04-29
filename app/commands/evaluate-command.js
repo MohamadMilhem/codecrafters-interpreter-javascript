@@ -1,5 +1,5 @@
 import {parseCommand} from "./parse-command.js";
-import {error} from "../utils/logger.js";
+import {error, plainError} from "../utils/logger.js";
 import {EvaluationError} from "../utils/error-handler.js";
 import {tokenType} from "../constants/token-type.js";
 
@@ -50,11 +50,21 @@ function evaluatingUnaryExpr(unaryExpr) {
         case tokenType.BANG:
             return !isTruthy(right);
         case tokenType.MINUS:
-            return -right;
+            if (canBeNegative(right))
+                return -right;
+            else {
+                plainError("Operand must be a number.");
+                process.exit(70);
+            }
     }
     // unreachable (maybe return the same right).
     return right;
 }
+
+function canBeNegative(expression){
+    return typeof expression == "number";
+}
+
 
 function isTruthy(expression) {
     if (expression === null)

@@ -27,5 +27,5 @@ export function printTokens(tokens){
 }
 
 export function plainError(text){
-    console.log(text);
+    console.error(text);
 }
