@@ -68,48 +68,100 @@ function evaluatingGrouping(groupingExpr) {
 function evaluatingBinaryExpr(binaryExpr) {
     let right = evaluate(binaryExpr.rightExpression);
     let left = evaluate(binaryExpr.leftExpression);
+    try {
+        switch (binaryExpr.operator.type) {
+            case tokenType.EQUAL_EQUAL:
+                return left === right;
 
-    switch (binaryExpr.operator.type) {
-        case tokenType.BANG_EQUAL:
-            return left !== right;
-        case tokenType.GREATER:
-            return left > right;
-        case tokenType.EQUAL_EQUAL:
-            return left === right;
-        case tokenType.GREATER_EQUAL:
-            return left >= right;
-        case tokenType.LESS_EQUAL:
-            return left <= right;
-        case tokenType.LESS:
-            return left < right;
-        case tokenType.MINUS:
-            if (isNumber(left) && isNumber(right))
-                return left - right;
-            plainError("Operands must be a numbers.");
-            process.exit(70);
-        case tokenType.PLUS:
-            if (isNumber(left) && isNumber(right) ||
-                isString(left) && isString(right)) {
-                return left + right;
-            }
+            case tokenType.BANG_EQUAL:
+                return left !== right;
 
-            plainError("Both Operands must be a numbers or strings.");
-            process.exit(70);
+            case tokenType.GREATER:
+                if (checkOperatorAvailabity(binaryExpr.operator, left, right))
+                    return left > right;
+                throw new EvaluationError("Both operands must be numbers or strings.");
 
-        case tokenType.SLASH:
-            if (isNumber(left) && isNumber(right))
-                return left / right;
-            plainError("Operand must be a number.");
-            process.exit(70);
-        case tokenType.STAR:
-            if(isNumber(left) && isNumber(right))
-                return left * right;
-            plainError("Operand must be a number.");
-            process.exit(70);
+            case tokenType.GREATER_EQUAL:
+                if (checkOperatorAvailabity(binaryExpr.operator, left, right))
+                    return left >= right;
+                throw new EvaluationError("Both operands must be numbers or strings.");
+
+            case tokenType.LESS_EQUAL:
+                if (checkOperatorAvailabity(binaryExpr.operator, left, right))
+                    return left <= right;
+                throw new EvaluationError("Both operands must be numbers or strings.");
+
+            case tokenType.LESS:
+                if (checkOperatorAvailabity(binaryExpr.operator, left, right))
+                    return left < right;
+                throw new EvaluationError("Both operands must be numbers or strings.");
+
+            case tokenType.PLUS:
+                if (checkOperatorAvailabity(binaryExpr.operator, left, right))
+                    return left + right;
+                throw new EvaluationError("Both operands must be numbers or strings.");
+
+            case tokenType.MINUS:
+                if (checkOperatorAvailabity(binaryExpr.operator, left, right))
+                    return left - right;
+                throw new EvaluationError("Both operands must be numbers.");
+
+            case tokenType.SLASH:
+                if (checkOperatorAvailabity(binaryExpr.operator, left, right))
+                    return left / right;
+                throw new EvaluationError("Both operands must be numbers.");
+
+            case tokenType.STAR:
+                if (checkOperatorAvailabity(binaryExpr.operator, left, right))
+                    return left * right;
+                throw new EvaluationError("Both operands must be numbers.");
+        }
+    } catch (e){
+        plainError(e.line);
+        process.exit(70);
     }
-
     return null;
 }
+
+
+function checkOperatorAvailabity(operator, left, right){
+    switch (operator.type) {
+        case tokenType.BANG_EQUAL:
+            return true;
+        case tokenType.GREATER:
+            return (isNumber(left) && isNumber(right) ||
+                    isString(left) && isString(right));
+
+        case tokenType.EQUAL_EQUAL:
+            return true;
+
+        case tokenType.GREATER_EQUAL:
+            return (isNumber(left) && isNumber(right) ||
+                isString(left) && isString(right));
+
+        case tokenType.LESS_EQUAL:
+            return (isNumber(left) && isNumber(right) ||
+                isString(left) && isString(right));
+
+        case tokenType.LESS:
+            return (isNumber(left) && isNumber(right) ||
+                isString(left) && isString(right));
+
+        case tokenType.MINUS:
+            return (isNumber(left) && isNumber(right));
+
+        case tokenType.PLUS:
+            return (isNumber(left) && isNumber(right) ||
+                isString(left) && isString(right));
+
+        case tokenType.SLASH:
+            return (isNumber(left) && isNumber(right));
+
+        case tokenType.STAR:
+            return (isNumber(left) && isNumber(right));
+    }
+}
+
 
 function isTruthy(expression) {
     if (expression === null)
