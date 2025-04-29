@@ -73,6 +73,16 @@ function evaluatingBinaryExpr(binaryExpr) {
     let left = evaluate(binaryExpr.leftExpression);
 
     switch (binaryExpr.operator.type) {
+        case tokenType.GREATER:
+            return left > right;
+        case tokenType.EQUAL:
+            return left === right;
+        case tokenType.GREATER_EQUAL:
+            return left >= right;
+        case tokenType.LESS_EQUAL:
+            return left <= right;
+        case tokenType.LESS:
+            return left < right;
         case tokenType.MINUS:
             return left - right;
         case tokenType.PLUS:
