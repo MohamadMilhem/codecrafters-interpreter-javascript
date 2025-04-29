@@ -13,7 +13,7 @@ const args = process.argv.slice(2); // Skip the first two arguments (node path a
 
 
 if (args.length < 2) {
-  console.error("Usage: ./your_program.sh tokenize|parse <filename>");
+  console.error("Usage: ./your_program.sh tokenize|parse|evaluate <filename>");
   process.exit(1);
 }
 
