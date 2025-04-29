@@ -50,7 +50,7 @@ function evaluatingUnaryExpr(unaryExpr) {
         case tokenType.BANG:
             return !isTruthy(right);
         case tokenType.MINUS:
-            if (canBeNegative(right))
+            if (isNumber(right))
                 return -right;
             else {
                 plainError("Operand must be a number.");
@@ -61,7 +61,7 @@ function evaluatingUnaryExpr(unaryExpr) {
     return right;
 }
 
-function canBeNegative(expression){
+function isNumber(expression){
     return typeof expression == "number";
 }
 
@@ -100,9 +100,15 @@ function evaluatingBinaryExpr(binaryExpr) {
         case tokenType.PLUS:
             return left + right;
         case tokenType.SLASH:
-            return left / right;
+            if (isNumber(left) && isNumber(right))
+                return left / right;
+            plainError("Operand must be a number.");
+            process.exit(70);
         case tokenType.STAR:
-            return left * right;
+            if(isNumber(left) && isNumber(right))
+                return left * right;
+            plainError("Operand must be a number.");
+            process.exit(70);
     }
 
     return null;
