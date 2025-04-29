@@ -61,19 +61,6 @@ function evaluatingUnaryExpr(unaryExpr) {
     return right;
 }
 
-function isNumber(expression){
-    return typeof expression == "number";
-}
-
-
-function isTruthy(expression) {
-    if (expression === null)
-        return false;
-    if (typeof expression === "boolean")
-        return expression;
-    return true;
-}
-
 function evaluatingGrouping(groupingExpr) {
     return evaluate(groupingExpr.expression);
 }
@@ -96,9 +83,19 @@ function evaluatingBinaryExpr(binaryExpr) {
         case tokenType.LESS:
             return left < right;
         case tokenType.MINUS:
-            return left - right;
+            if (isNumber(left) && isNumber(right))
+                return left - right;
+            plainError("Operands must be a numbers.");
+            process.exit(70);
         case tokenType.PLUS:
-            return left + right;
+            if (isNumber(left) && isNumber(right) ||
+                isString(left) && isString(right)) {
+                return left + right;
+            }
+
+            plainError("Both Operands must be a numbers or strings.");
+            process.exit(70);
+
         case tokenType.SLASH:
             if (isNumber(left) && isNumber(right))
                 return left / right;
@@ -112,4 +109,20 @@ function evaluatingBinaryExpr(binaryExpr) {
     }
 
     return null;
+}
+
+function isTruthy(expression) {
+    if (expression === null)
+        return false;
+    if (typeof expression === "boolean")
+        return expression;
+    return true;
+}
+
+function isNumber(expression){
+    return typeof expression == "number";
+}
+
+function isString(expression){
+    return typeof expression == "string";
 }
