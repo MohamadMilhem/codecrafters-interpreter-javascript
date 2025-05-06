@@ -1,5 +1,6 @@
 export const commands = {
     TOKENIZE : 'tokenize',
     PARSE : 'parse',
-    EVALUATE : 'evaluate'
+    EVALUATE : 'evaluate',
+    RUN : 'run',
 }

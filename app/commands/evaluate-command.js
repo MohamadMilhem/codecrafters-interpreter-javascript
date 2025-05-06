@@ -16,7 +16,7 @@ export function evaluateCommand(expr) {
 }
 
 
-function evaluate(expr) {
+export function evaluate(expr) {
     switch (expr.name) {
         case "literal":
             return evaluatingLiterals(expr);

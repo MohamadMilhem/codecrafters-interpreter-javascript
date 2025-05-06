@@ -1,46 +1,72 @@
 import {errorsCountTokenize, tokenizeCommand} from "./tokenize-command.js";
-import { tokenType } from "../constants/token-type.js";
-import { ParseError } from "../utils/error-handler.js";
-import { error, plainError, parseError} from "../utils/logger.js";
+import {tokenType} from "../constants/token-type.js";
+import {ParseError} from "../utils/error-handler.js";
+import {error, plainError, parseError} from "../utils/logger.js";
+import {statementsTypes} from "../constants/statements-types.js";
 
 export let errorsCountParse = 0;
 let tokens = [];
 
 export function parseCommand(_tokens) {
-    try {
-        tokens = _tokens;
 
-        const result = expression(0);
+    tokens = _tokens;
+    let statements = [];
+    let curr_statement = null;
+    let curr_idx = 0;
 
-        if (!isAtEnd(result.curr_idx)){
-            parseError(peek(result.curr_idx), "Unexpected tokens after expression.");
-            errorsCountParse++;
-        }
+    do {
+        curr_statement = statement(curr_idx);
+        statements.push(curr_statement.statement);
 
-        return {
-            expr: result.expr,
-            hasErrors: errorsCountParse > 0,
-            errorCount: errorsCountParse,
-        };
-    } catch (e) {
-        if (e instanceof ParseError){
-            // Reported by parseError
-            return {
-                expr: {name: "error", value: null, message: e.message},
-                hasErrors: true,
-                errorCount: errorsCountParse,
-            };
-        } else {
-            // unexpected runtime error (not handled)
-            plainError("Parser crashed: " + e.message);
-            return {
-                expr: {name: "error", value: null, message: "Parser crashed"},
-                hasErrors: true,
-                errorCount: errorsCountParse + 1,
-            }
-        }
+        curr_idx = curr_statement.curr_idx;
+    } while (!isAtEnd(curr_idx));
+
+    if (!isAtEnd(curr_idx)){
+        parseError(peek(curr_idx), "Unexpected tokens after expression.");
+        errorsCountParse++;
+    }
+    return {
+        statements: statements,
+        hasErrors: errorsCountParse > 0,
+        errorCount: errorsCountParse,
     }
 }
+
+
+function statement(curr_idx) {
+    if (match([tokenType.PRINT], curr_idx)) {
+        curr_idx = consume(tokenType.PRINT, "Expected Print statement.", curr_idx);
+        return printStatement(curr_idx);
+    }
+    return expressionStatement(curr_idx);
+}
+
+function printStatement(curr_idx) {
+    const value = expression(curr_idx);
+    curr_idx = value.curr_idx;
+    curr_idx = consume(tokenType.SEMICOLON, "Expected ';' after expression.", curr_idx);
+    return {
+        statement: {
+            statementType: statementsTypes.STATEMENT_PRINT,
+            exprValue: value.expr,
+        },
+        curr_idx: curr_idx,
+    }
+}
+
+function expressionStatement(curr_idx) {
+    const value = expression(curr_idx);
+    curr_idx = value.curr_idx;
+    curr_idx = consume(tokenType.SEMICOLON, "Expected ';' after expression.", curr_idx);
+    return {
+        statement: {
+            statementType: statementsTypes.STATEMENT_EXPR,
+            exprValue: value.expr
+        },
+        curr_idx: curr_idx,
+    }
+}
+
 
 function synchronize(curr_idx) {
     if (isAtEnd(curr_idx)) {
@@ -49,10 +75,10 @@ function synchronize(curr_idx) {
 
     curr_idx++;
 
-    while(!isAtEnd(curr_idx)){
+    while (!isAtEnd(curr_idx)) {
         if (previous(curr_idx).type === tokenType.SEMICOLON) return curr_idx;
 
-        switch(peek(curr_idx).type){
+        switch (peek(curr_idx).type) {
             case tokenType.CLASS:
             case tokenType.FUNCTION:
             case tokenType.VAR:
@@ -76,7 +102,7 @@ function expression(curr_idx) {
 
 function equality(curr_idx) {
     try {
-        let { expr, curr_idx: newIdx } = comparison(curr_idx);
+        let {expr, curr_idx: newIdx} = comparison(curr_idx);
         curr_idx = newIdx;
 
         while (match([tokenType.BANG_EQUAL, tokenType.EQUAL_EQUAL], curr_idx)) {
@@ -84,7 +110,7 @@ function equality(curr_idx) {
             const operator = previous(curr_idx);
 
             try {
-                const { expr: right, curr_idx: next_idx } = comparison(curr_idx);
+                const {expr: right, curr_idx: next_idx} = comparison(curr_idx);
                 curr_idx = next_idx;
                 expr = {
                     name: "binary",
@@ -109,13 +135,13 @@ function equality(curr_idx) {
             }
         }
 
-        return { expr, curr_idx };
+        return {expr, curr_idx};
     } catch (e) {
         if (e instanceof ParseError) {
             if (!isAtEnd(curr_idx))
                 curr_idx = synchronize(curr_idx);
             return {
-                expr: { name: "error", value: null, message: e.message },
+                expr: {name: "error", value: null, message: e.message},
                 curr_idx
             };
         }
@@ -125,7 +151,7 @@ function equality(curr_idx) {
 
 function comparison(curr_idx) {
     try {
-        let { expr, curr_idx: new_idx } = term(curr_idx);
+        let {expr, curr_idx: new_idx} = term(curr_idx);
         curr_idx = new_idx;
 
         while (match([tokenType.GREATER, tokenType.GREATER_EQUAL, tokenType.LESS, tokenType.LESS_EQUAL,], curr_idx)) {
@@ -133,7 +159,7 @@ function comparison(curr_idx) {
             const operator = previous(curr_idx);
 
             try {
-                const { expr: right, curr_idx: next_idx } = term(curr_idx);
+                const {expr: right, curr_idx: next_idx} = term(curr_idx);
                 curr_idx = next_idx;
                 expr = {
                     name: "binary",
@@ -157,12 +183,12 @@ function comparison(curr_idx) {
             }
         }
 
-        return { expr, curr_idx };
+        return {expr, curr_idx};
     } catch (e) {
         if (e instanceof ParseError) {
             curr_idx = synchronize(curr_idx);
             return {
-                expr: { name: "error", value: null, message: e.message },
+                expr: {name: "error", value: null, message: e.message},
                 curr_idx
             };
         }
@@ -175,7 +201,7 @@ function term(curr_idx) {
         let {expr, curr_idx: new_idx} = factor(curr_idx);
         curr_idx = new_idx;
 
-        while(match([tokenType.MINUS, tokenType.PLUS], curr_idx)) {
+        while (match([tokenType.MINUS, tokenType.PLUS], curr_idx)) {
             curr_idx++;
             const operator = previous(curr_idx);
 
@@ -209,7 +235,7 @@ function term(curr_idx) {
         if (e instanceof ParseError) {
             curr_idx = synchronize(curr_idx);
             return {
-                expr: { name: "error", value: null, message: e.message },
+                expr: {name: "error", value: null, message: e.message},
                 curr_idx
             };
         }
@@ -222,7 +248,7 @@ function factor(curr_idx) {
         let {expr, curr_idx: new_idx} = unary(curr_idx);
         curr_idx = new_idx;
 
-        while(match([tokenType.SLASH, tokenType.STAR], curr_idx)) {
+        while (match([tokenType.SLASH, tokenType.STAR], curr_idx)) {
             curr_idx++;
             const operator = previous(curr_idx);
 
@@ -256,7 +282,7 @@ function factor(curr_idx) {
         if (e instanceof ParseError) {
             curr_idx = synchronize(curr_idx);
             return {
-                expr: { name: "error", value: null, message: e.message },
+                expr: {name: "error", value: null, message: e.message},
                 curr_idx
             };
         }
@@ -297,14 +323,14 @@ function unary(curr_idx) {
     return primary(curr_idx);
 }
 
-function primary(curr_idx){
+function primary(curr_idx) {
     if (match([tokenType.FALSE], curr_idx)) {
         curr_idx++;
         let expr = {
             name: "literal",
             value: false
         };
-        return {expr, curr_idx} ;
+        return {expr, curr_idx};
     }
     if (match([tokenType.TRUE], curr_idx)) {
         curr_idx++;
@@ -312,15 +338,15 @@ function primary(curr_idx){
             name: "literal",
             value: true
         };
-        return {expr, curr_idx} ;
+        return {expr, curr_idx};
     }
-    if (match([tokenType.NIL], curr_idx)){
+    if (match([tokenType.NIL], curr_idx)) {
         curr_idx++;
         let expr = {
             name: "literal",
             value: null
         };
-        return {expr, curr_idx} ;
+        return {expr, curr_idx};
     }
 
     if (match([tokenType.NUMBER, tokenType.STRING], curr_idx)) {
@@ -338,10 +364,10 @@ function primary(curr_idx){
         curr_idx = next_idx;
         try {
             curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after expression.", curr_idx);
-            expr = { name: "grouping", expression: expr};
+            expr = {name: "grouping", expression: expr};
             return {expr, curr_idx};
         } catch (e) {
-            if (e instanceof ParseError){
+            if (e instanceof ParseError) {
                 // synchronize after error.
                 curr_idx = synchronize(curr_idx);
                 return {
