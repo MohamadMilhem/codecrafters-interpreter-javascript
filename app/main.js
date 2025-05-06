@@ -12,7 +12,7 @@ import {statementsTypes} from "./constants/statements-types.js";
 
 function main() {
   const args = process.argv.slice(2);
-  //let args = ["run", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+  //let args = ["evaluate", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
 
   if (args.length < 2) {
     console.error("Usage: ./your_program.sh tokenize|parse|evaluate <filename>");
@@ -63,7 +63,13 @@ function executeCommand(command, fileContent) {
     process.exit(EXIT_CODE.SUCCESS);
   }
 
-  // Evaluate the expression
+  if (command === commands.EVALUATE){
+    let evaluateResult = evaluateCommand(parseResult.statements.at(0).exprValue);
+    console.log(evaluateResult === null ? "nil" :  evaluateResult);
+    process.exit(EXIT_CODE.SUCCESS);
+  }
+
+  // run program
   if (command === commands.RUN) {
     interpret(parseResult.statements);
     process.exit(EXIT_CODE.SUCCESS);
@@ -93,7 +99,7 @@ function executeStatement(statement){
     console.log(value.toString());
     return null;
   }
-  else if (statement.exprValue === statementsTypes.STATEMENT_EXPR){
+  else if (statement.statementType === statementsTypes.STATEMENT_EXPR){
     evaluate(statement.exprValue);
     return null;
   }

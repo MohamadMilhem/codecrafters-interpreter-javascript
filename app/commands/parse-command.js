@@ -44,7 +44,8 @@ function statement(curr_idx) {
 function printStatement(curr_idx) {
     const value = expression(curr_idx);
     curr_idx = value.curr_idx;
-    curr_idx = consume(tokenType.SEMICOLON, "Expected ';' after expression.", curr_idx);
+    if (!isAtEnd(curr_idx))
+        curr_idx = consume(tokenType.SEMICOLON, "Expected ';' after expression.", curr_idx);
     return {
         statement: {
             statementType: statementsTypes.STATEMENT_PRINT,
@@ -57,7 +58,8 @@ function printStatement(curr_idx) {
 function expressionStatement(curr_idx) {
     const value = expression(curr_idx);
     curr_idx = value.curr_idx;
-    curr_idx = consume(tokenType.SEMICOLON, "Expected ';' after expression.", curr_idx);
+    if (!isAtEnd(curr_idx))
+        curr_idx = consume(tokenType.SEMICOLON, "Expected ';' after expression.", curr_idx);
     return {
         statement: {
             statementType: statementsTypes.STATEMENT_EXPR,
