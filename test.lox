@@ -1,1 +1,2 @@
-"foo"!="baz"
+var a;
+print a;

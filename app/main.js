@@ -8,11 +8,12 @@ import {EvaluationError, ParseError, TokenizationError} from "./utils/error-hand
 import {commands} from "./constants/commands.js";
 import {EXIT_CODE} from "./constants/exit-code.js";
 import {statementsTypes} from "./constants/statements-types.js";
+import {define} from "./utils/enviroment.js";
 
 
 function main() {
   const args = process.argv.slice(2);
-  //let args = ["parse", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+  //let args = ["run", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
 
   if (args.length < 2) {
     console.error("Usage: ./your_program.sh tokenize|parse|evaluate <filename>");
@@ -66,7 +67,7 @@ function executeCommand(command, fileContent) {
 
   if (command === commands.EVALUATE){
     let evaluateResult = evaluateCommand(parseResult.statements.at(0).exprValue);
-    console.log(evaluateResult === null ? "nil" :  evaluateResult);
+    console.log(evaluateResult);
     process.exit(EXIT_CODE.SUCCESS);
   }
 
@@ -96,12 +97,21 @@ function interpret(statements) {
 
 function executeStatement(statement){
   if (statement.statementType === statementsTypes.STATEMENT_PRINT){
-    let value = evaluate(statement.exprValue);
+    let value = evaluateCommand(statement.exprValue);
     console.log(value.toString());
     return null;
   }
   else if (statement.statementType === statementsTypes.STATEMENT_EXPR){
-    evaluate(statement.exprValue);
+    evaluateCommand(statement.exprValue);
+    return null;
+  }
+  else if (statement.statementType === statementsTypes.STATEMENT_VAR_DEC){
+    let value = null;
+    if (statement.exprValue !== null){
+      value = evaluateCommand(statement.exprValue);
+    }
+
+    define(statement.nameToken.text, value);
     return null;
   }
 }

@@ -15,7 +15,7 @@ export function parseCommand(_tokens) {
     let curr_idx = 0;
 
     do {
-        curr_statement = statement(curr_idx);
+        curr_statement = declaration(curr_idx);
         statements.push(curr_statement.statement);
 
         curr_idx = curr_statement.curr_idx;
@@ -29,6 +29,46 @@ export function parseCommand(_tokens) {
         statements: statements,
         hasErrors: errorsCountParse > 0,
         errorCount: errorsCountParse,
+    }
+}
+
+function declaration(curr_idx) {
+    try {
+        if (match([tokenType.VAR], curr_idx)) {
+            curr_idx = consume(tokenType.VAR, "" ,curr_idx);
+            return varDeclaration(curr_idx);
+        }
+        return statement(curr_idx);
+    } catch (e) {
+        synchronize();
+        return null;
+    }
+}
+
+function varDeclaration(curr_idx) {
+    if (!match([tokenType.IDENTIFIER], curr_idx)) {
+        throw new ParseError(peek(curr_idx), "Expected IDENTIFIER to be identifiable.");
+    }
+
+    let name = tokens[curr_idx];
+    curr_idx = consume(tokenType.IDENTIFIER, "" ,curr_idx);
+
+    let initializer = null;
+    if (match([tokenType.EQUAL], curr_idx)) {
+        curr_idx = consume(tokenType.EQUAL, "" , curr_idx);
+        initializer = expression(curr_idx);
+        curr_idx = initializer.curr_idx;
+    }
+
+    curr_idx = consume(tokenType.SEMICOLON, "Expect ';' after variable declaration.", curr_idx);
+
+    return {
+        statement : {
+            statementType : statementsTypes.STATEMENT_VAR_DEC,
+            exprValue : initializer !== null ? initializer.expr : null,
+            nameToken : name,
+        },
+        curr_idx : curr_idx
     }
 }
 
@@ -357,6 +397,15 @@ function primary(curr_idx) {
             name: "literal",
             value: previous(curr_idx).value,
         };
+        return {expr, curr_idx};
+    }
+
+    if (match([tokenType.IDENTIFIER], curr_idx)) {
+        curr_idx++;
+        let expr = {
+            name: "variable",
+            value: previous(curr_idx).text
+        }
         return {expr, curr_idx};
     }
 
