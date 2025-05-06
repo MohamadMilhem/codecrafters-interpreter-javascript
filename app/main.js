@@ -12,7 +12,7 @@ import {statementsTypes} from "./constants/statements-types.js";
 
 function main() {
   const args = process.argv.slice(2);
-  //let args = ["evaluate", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+  //let args = ["parse", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
 
   if (args.length < 2) {
     console.error("Usage: ./your_program.sh tokenize|parse|evaluate <filename>");
@@ -40,13 +40,12 @@ function executeCommand(command, fileContent) {
   // Always tokenize first regardless of command
   const tokenizeResult = runTokenizer(fileContent);
 
-  if (tokenizeResult.hasErrors) {
-    process.exit(EXIT_CODE.SYNTAX_ERROR);
-  }
-
   // For tokenize command, we're done
   if (command === commands.TOKENIZE) {
     printTokens(tokenizeResult.tokens);
+    if (tokenizeResult.hasErrors) {
+      process.exit(EXIT_CODE.SYNTAX_ERROR);
+    }
     process.exit(EXIT_CODE.SUCCESS);
   }
 
@@ -59,7 +58,9 @@ function executeCommand(command, fileContent) {
 
   // For parse command, we're done
   if (command === commands.PARSE) {
-    astPrint(parseResult.statements);
+    for (let statement of parseResult.statements) {
+      astPrint(statement.exprValue);
+    }
     process.exit(EXIT_CODE.SUCCESS);
   }
 
