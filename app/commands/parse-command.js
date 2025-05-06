@@ -6,15 +6,9 @@ import { error, plainError, parseError} from "../utils/logger.js";
 export let errorsCountParse = 0;
 let tokens = [];
 
-export function parseCommand(fileContent) {
+export function parseCommand(_tokens) {
     try {
-        const tokenizeResult = tokenizeCommand(fileContent);
-
-        if (tokenizeResult.hasErrors){
-            // report by the tokenizer.
-            process.exit(65);
-        }
-        tokens = tokenizeResult.tokens;
+        tokens = _tokens;
 
         const result = expression(0);
 

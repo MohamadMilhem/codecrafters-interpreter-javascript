@@ -1,73 +1,114 @@
 import fs from "fs";
-import {tokenizeCommand, errorsCountTokenize} from "./commands/tokenize-command.js"
+import {tokenizeCommand} from "./commands/tokenize-command.js";
+import {parseCommand} from "./commands/parse-command.js";
+import {evaluateCommand} from "./commands/evaluate-command.js";
 import {error, plainError, printTokens} from "./utils/logger.js";
 import {astPrint} from "./utils/ast-printer.js";
-import {errorsCountParse, parseCommand} from "./commands/parse-command.js";
 import {ParseError, TokenizationError} from "./utils/error-handler.js";
 import {commands} from "./constants/commands.js";
-import {evaluateCommand} from "./commands/evaluate-command.js";
-
-const args = process.argv.slice(2); // Skip the first two arguments (node path and script path)
-
-//let args = ["evaluate", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+import {EXIT_CODE} from "./constants/exit-code.js";
 
 
-if (args.length < 2) {
-  console.error("Usage: ./your_program.sh tokenize|parse|evaluate <filename>");
-  process.exit(1);
+function main() {
+  const args = process.argv.slice(2);
+  //let args = ["evaluate", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+
+  if (args.length < 2) {
+    console.error("Usage: ./your_program.sh tokenize|parse|evaluate <filename>");
+    process.exit(EXIT_CODE.USAGE_ERROR);
+  }
+
+  const command = args[0];
+  const filename = args[1];
+
+  try {
+    const fileContent = fs.readFileSync(filename, "utf8");
+    executeCommand(command, fileContent);
+  } catch (err) {
+    plainError(`Error reading file: ${err.message}`);
+    process.exit(EXIT_CODE.USAGE_ERROR);
+  }
 }
 
-const command = args[0];
-const filename = args[1];
-const fileContent = fs.readFileSync(filename, "utf8");
+/**
+ * Execute the requested command on the given content
+ * @param {string} command - The command to execute (tokenize, parse, evaluate)
+ * @param {string} fileContent - The content to process
+ */
+function executeCommand(command, fileContent) {
+  // Always tokenize first regardless of command
+  const tokenizeResult = runTokenizer(fileContent);
 
-if (command === commands.TOKENIZE) {
-  try {
-    const tokenizeResult = tokenizeCommand(fileContent);
+  if (tokenizeResult.hasErrors) {
+    process.exit(EXIT_CODE.SYNTAX_ERROR);
+  }
+
+  // For tokenize command, we're done
+  if (command === commands.TOKENIZE) {
     printTokens(tokenizeResult.tokens);
-    if (tokenizeResult.hasErrors){
-      process.exit(65);
-    }
-    process.exit(0);
-  } catch (e){
-    if (e instanceof TokenizationError) {
-        error(e.line, e.message, "Tokenization error");
-    }
-    process.exit(65);
+    process.exit(EXIT_CODE.SUCCESS);
   }
-}
 
-if (command === commands.PARSE){
-  try {
-    let parseResult = parseCommand(fileContent);
+  // Parse the tokens if needed
+  const parseResult = runParser(tokenizeResult.tokens);
 
-    if (parseResult.hasErrors) {
-      // Errors were already reported by the parser
-      process.exit(65);
-    }
+  if (parseResult.hasErrors) {
+    process.exit(EXIT_CODE.SYNTAX_ERROR);
+  }
 
+  // For parse command, we're done
+  if (command === commands.PARSE) {
     astPrint(parseResult.expr);
-    process.exit(0);
-  } catch (e) {
-    // Handle any unexpected errors not caught by the parser
-    if (e instanceof TokenizationError) {
-      error(e.line, e.message, "Tokenization error");
-    }
-    if (e instanceof ParseError)
-      plainError(`Unexpected error during parsing: ${e.message}`);
+    process.exit(EXIT_CODE.SUCCESS);
+  }
 
-    process.exit(65);  // Different exit code for runtime errors
+  // Evaluate the expression
+  if (command === commands.EVALUATE) {
+    const evaluateResult = evaluateCommand(parseResult.expr);
+    console.log(evaluateResult === null ? "nil" : evaluateResult);
+    process.exit(EXIT_CODE.SUCCESS);
+  }
+
+  // Unknown command
+  console.error(`Usage: Unknown command: ${command}`);
+  process.exit(EXIT_CODE.USAGE_ERROR);
+}
+
+/**
+ * Run the tokenizer on the input content
+ * @param {string} fileContent - The content to tokenize
+ * @returns {Object} The tokenization result
+ */
+function runTokenizer(fileContent) {
+  try {
+    return tokenizeCommand(fileContent);
+  } catch (e) {
+    if (e instanceof TokenizationError) {
+      error(e.line, e.message, "Tokenization Error");
+    } else {
+      plainError(`Unexpected error during tokenization: ${e.message}`);
+    }
+    process.exit(EXIT_CODE.SYNTAX_ERROR);
   }
 }
 
-
-if (command === commands.EVALUATE){
-  let evaluateResult = evaluateCommand(fileContent);
-  console.log(evaluateResult === null ? "nil" : evaluateResult);
-  process.exit(0);
+/**
+ * Run the parser on the provided tokens
+ * @param {Array} tokens - The tokens to parse
+ * @returns {Object} The parsing result
+ */
+function runParser(tokens) {
+  try {
+    return parseCommand(tokens);
+  } catch (e) {
+    if (e instanceof ParseError) {
+      plainError(`Unexpected error during parsing: ${e.message}`);
+    } else {
+      plainError(`Unexpected error: ${e.message}`);
+    }
+    process.exit(EXIT_CODE.SYNTAX_ERROR);
+  }
 }
 
-
-
-console.error(`Usage: Unknown command: ${command}`);
-process.exit(1);
+// Start the program
+main();

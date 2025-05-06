@@ -2,22 +2,16 @@ import {parseCommand} from "./parse-command.js";
 import {error, plainError} from "../utils/logger.js";
 import {EvaluationError} from "../utils/error-handler.js";
 import {tokenType} from "../constants/token-type.js";
+import {EXIT_CODE} from "../constants/exit-code.js";
 
-export function evaluateCommand(fileContent) {
+export function evaluateCommand(expr) {
     try {
-        let parseResult = parseCommand(fileContent);
-
-        if (parseResult.hasErrors){
-            // Errors were reported by the parser.
-            process.exit(65);
-        }
-
-        return evaluate(parseResult.expr);
+        return evaluate(expr);
     } catch (e) {
         if (e instanceof EvaluationError){
             error(e.line, e.message, "Evaluation error");
         }
-        process.exit(65);
+        process.exit(EXIT_CODE.RUNTIME_ERROR);
     }
 }
 
@@ -54,7 +48,7 @@ function evaluatingUnaryExpr(unaryExpr) {
                 return -right;
             else {
                 plainError("Operand must be a number.");
-                process.exit(70);
+                process.exit(EXIT_CODE.RUNTIME_ERROR);
             }
     }
     // unreachable (maybe return the same right).
@@ -118,7 +112,7 @@ function evaluatingBinaryExpr(binaryExpr) {
         }
     } catch (e){
         plainError(e.line);
-        process.exit(70);
+        process.exit(EXIT_CODE.RUNTIME_ERROR);
     }
     return null;
 }
