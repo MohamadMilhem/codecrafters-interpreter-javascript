@@ -1,12 +1,21 @@
-var n = 10;
-var fm = 0;
-var fn = 1;
-var index = 0;
+var quz = "after";
+{
+  var quz = "before";
 
-while (index < n) {
-  print fm;
-  var temp = fm;
-  fm = fn;
-  fn = temp + fn;
-  index = index + 1;
+  for (var quz = 0; quz < 1; quz = quz + 1) {
+    print quz;
+    var quz = -1;
+    print quz;
+  }
+}
+
+{
+  for (var quz = 0; quz > 0; quz = quz + 1) {}
+
+  var quz = "after";
+  print quz;
+
+  for (quz = 0; quz < 1; quz = quz + 1) {
+    print quz;
+  }
 }

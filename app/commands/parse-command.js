@@ -91,6 +91,10 @@ function statement(curr_idx) {
         curr_idx = consume(tokenType.WHILE, "Expected while statement.", curr_idx);
         return whileStatement(curr_idx);
     }
+    if (match([tokenType.FOR], curr_idx)){
+        curr_idx = consume(tokenType.FOR, "Expect for statement.", curr_idx);
+        return forStatement(curr_idx);
+    }
     return expressionStatement(curr_idx);
 }
 
@@ -184,6 +188,85 @@ function expressionStatement(curr_idx) {
     }
 }
 
+function forStatement(curr_idx){
+    curr_idx = consume(tokenType.LEFT_PAREN, "Expect '(' after 'for'." , curr_idx);
+
+    let initializer;
+    if (match([tokenType.SEMICOLON], curr_idx)) {
+        curr_idx = consume(tokenType.SEMICOLON, "", curr_idx);
+        initializer = null;
+    } else if (match([tokenType.VAR], curr_idx)) {
+        curr_idx = consume(tokenType.VAR, "", curr_idx);
+        initializer = varDeclaration(curr_idx);
+        curr_idx = initializer.curr_idx;
+
+    } else {
+        initializer = expressionStatement(curr_idx);
+        curr_idx = initializer.curr_idx;
+    }
+
+    let condition_expr = null;
+    if (!check(tokenType.SEMICOLON, curr_idx)) {
+        condition_expr = expression(curr_idx);
+        curr_idx = condition_expr.curr_idx;
+    }
+
+    curr_idx = consume(tokenType.SEMICOLON, "Expect ';' after loop condition.", curr_idx);
+
+    let increment_expr = null;
+    if (!check(tokenType.RIGHT_PAREN, curr_idx)) {
+        increment_expr = expression(curr_idx);
+        curr_idx = increment_expr.curr_idx;
+    }
+
+    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after for clauses.", curr_idx);
+    let body = statement(curr_idx);
+    curr_idx = body.curr_idx;
+
+    if (increment_expr !== null) {
+        body = {
+            statement: {
+                statementType: statementsTypes.STATEMENT_BLOCK,
+                statements: [body.statement,
+                    {
+                    statementType : statementsTypes.STATEMENT_EXPR,
+                    exprValue : increment_expr.expr,
+                    }
+                ],
+            },
+            curr_idx : curr_idx
+        };
+    }
+
+    if (condition_expr === null) {
+        condition_expr = {
+            name : "literal",
+            value : true,
+        };
+    }
+
+    body = {
+        statement: {
+            statementType: statementsTypes.STATEMENT_WHILE,
+            condition_expr: condition_expr,
+            body: body,
+        } ,
+        curr_idx : curr_idx
+    };
+
+    if (initializer !== null){
+        body = {
+            statement: {
+                statementType: statementsTypes.STATEMENT_BLOCK,
+                statements: [initializer.statement, body.statement],
+            },
+            curr_idx: curr_idx
+        }
+    }
+
+    return body;
+
+}
 
 function synchronize(curr_idx) {
     if (isAtEnd(curr_idx)) {
