@@ -1,2 +1,5 @@
-var a;
-print a;
+var hello = 93;
+var bar = 93;
+bar = hello;
+hello = bar;
+print hello + bar;

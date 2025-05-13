@@ -3,6 +3,7 @@ import {tokenType} from "../constants/token-type.js";
 import {ParseError} from "../utils/error-handler.js";
 import {error, plainError, parseError} from "../utils/logger.js";
 import {statementsTypes} from "../constants/statements-types.js";
+import {errorType} from "../constants/error-type.js";
 
 export let errorsCountParse = 0;
 let tokens = [];
@@ -139,7 +140,34 @@ function synchronize(curr_idx) {
 }
 
 function expression(curr_idx) {
-    return equality(curr_idx);
+    return assignment(curr_idx);
+}
+
+function assignment(curr_idx) {
+    const expression = equality(curr_idx);
+    curr_idx = expression.curr_idx;
+
+    if (match([tokenType.EQUAL], curr_idx)) {
+        const equals_idx = curr_idx;
+        curr_idx = consume(tokenType.EQUAL, "", curr_idx);
+
+        const value = assignment(curr_idx);
+        curr_idx = value.curr_idx;
+
+        if (expression?.expr?.name === 'variable'){
+            return {
+                expr: {
+                    name: "assignment",
+                    valueExpr : value.expr,
+                    nameExpr : expression.expr,
+                },
+                curr_idx : curr_idx
+            };
+        }
+
+        error(tokens[equals_idx].line, errorType.INVALID_ASSIGNMENT_TARGET);
+    }
+    return expression;
 }
 
 function equality(curr_idx) {

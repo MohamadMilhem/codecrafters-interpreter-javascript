@@ -3,7 +3,7 @@ import {error, plainError} from "../utils/logger.js";
 import {EvaluationError} from "../utils/error-handler.js";
 import {tokenType} from "../constants/token-type.js";
 import {EXIT_CODE} from "../constants/exit-code.js";
-import {define, get} from "../utils/enviroment.js";
+import {assign, define, get} from "../utils/enviroment.js";
 
 export function evaluateCommand(expr) {
     try {
@@ -29,6 +29,8 @@ export function evaluate(expr) {
             return evaluatingBinaryExpr(expr);
         case "variable":
             return evaluateVariable(expr);
+        case "assignment":
+            return evaluateAssignment(expr);
         default:
             return null;
     }
@@ -76,35 +78,35 @@ function evaluatingBinaryExpr(binaryExpr) {
                 return left !== right;
 
             case tokenType.GREATER:
-                if (checkOperatorAvailabity(binaryExpr.operator, left, right)) return left > right;
+                if (checkOperatorAvailability(binaryExpr.operator, left, right)) return left > right;
                 throw new EvaluationError("Both operands must be numbers or strings.");
 
             case tokenType.GREATER_EQUAL:
-                if (checkOperatorAvailabity(binaryExpr.operator, left, right)) return left >= right;
+                if (checkOperatorAvailability(binaryExpr.operator, left, right)) return left >= right;
                 throw new EvaluationError("Both operands must be numbers or strings.");
 
             case tokenType.LESS_EQUAL:
-                if (checkOperatorAvailabity(binaryExpr.operator, left, right)) return left <= right;
+                if (checkOperatorAvailability(binaryExpr.operator, left, right)) return left <= right;
                 throw new EvaluationError("Both operands must be numbers or strings.");
 
             case tokenType.LESS:
-                if (checkOperatorAvailabity(binaryExpr.operator, left, right)) return left < right;
+                if (checkOperatorAvailability(binaryExpr.operator, left, right)) return left < right;
                 throw new EvaluationError("Both operands must be numbers or strings.");
 
             case tokenType.PLUS:
-                if (checkOperatorAvailabity(binaryExpr.operator, left, right)) return left + right;
+                if (checkOperatorAvailability(binaryExpr.operator, left, right)) return left + right;
                 throw new EvaluationError("Both operands must be numbers or strings.");
 
             case tokenType.MINUS:
-                if (checkOperatorAvailabity(binaryExpr.operator, left, right)) return left - right;
+                if (checkOperatorAvailability(binaryExpr.operator, left, right)) return left - right;
                 throw new EvaluationError("Both operands must be numbers.");
 
             case tokenType.SLASH:
-                if (checkOperatorAvailabity(binaryExpr.operator, left, right)) return left / right;
+                if (checkOperatorAvailability(binaryExpr.operator, left, right)) return left / right;
                 throw new EvaluationError("Both operands must be numbers.");
 
             case tokenType.STAR:
-                if (checkOperatorAvailabity(binaryExpr.operator, left, right)) return left * right;
+                if (checkOperatorAvailability(binaryExpr.operator, left, right)) return left * right;
                 throw new EvaluationError("Both operands must be numbers.");
         }
     } catch (e) {
@@ -115,7 +117,7 @@ function evaluatingBinaryExpr(binaryExpr) {
 }
 
 
-function checkOperatorAvailabity(operator, left, right) {
+function checkOperatorAvailability(operator, left, right) {
     switch (operator.type) {
         case tokenType.BANG_EQUAL:
             return true;
@@ -146,6 +148,18 @@ function checkOperatorAvailabity(operator, left, right) {
         case tokenType.STAR:
             return (isNumber(left) && isNumber(right));
     }
+}
+
+function evaluateAssignment(expr){
+    let name = expr.nameExpr;
+    let value = evaluate(expr.valueExpr);
+
+    if (name.name !== "variable"){
+        throw EvaluationError("left side of assignment expression should be a variable.");
+    }
+
+    assign(name.value, value);
+    return value;
 }
 
 
