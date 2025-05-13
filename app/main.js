@@ -1,7 +1,7 @@
 import fs from "fs";
 import {tokenizeCommand} from "./commands/tokenize-command.js";
 import {parseCommand} from "./commands/parse-command.js";
-import {evaluate, evaluateCommand} from "./commands/evaluate-command.js";
+import {evaluate, evaluateCommand, isTruthy} from "./commands/evaluate-command.js";
 import {error, plainError, printTokens} from "./utils/logger.js";
 import {astPrint} from "./utils/ast-printer.js";
 import {EvaluationError, ParseError, TokenizationError} from "./utils/error-handler.js";
@@ -121,6 +121,14 @@ function executeStatement(statement){
       executeStatement(statement);
     }
     destroyInnerEnv();
+    return null;
+  }
+  else if (statement.statementType === statementsTypes.STATEMENT_IF){
+    if (isTruthy(evaluate(statement.condition_expr.expr))){
+      executeStatement(statement.thenBranch.statement);
+    } else if (statement.elseBranch !== null){
+      executeStatement(statement.elseBranch.statement);
+    }
     return null;
   }
 }

@@ -163,7 +163,7 @@ function evaluateAssignment(expr){
 }
 
 
-function isTruthy(expression) {
+export function isTruthy(expression) {
     if (expression === null) return false;
     if (typeof expression === "boolean") return expression;
     return true;

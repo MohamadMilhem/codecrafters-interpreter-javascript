@@ -83,6 +83,10 @@ function statement(curr_idx) {
         curr_idx = consume(tokenType.LEFT_BRACE, "Expected beginning of a block.", curr_idx);
         return blockStatement(curr_idx);
     }
+    if (match([tokenType.IF], curr_idx)) {
+        curr_idx = consume(tokenType.IF, "Expected if statement.", curr_idx);
+        return ifStatement(curr_idx);
+    }
     return expressionStatement(curr_idx);
 }
 
@@ -115,6 +119,32 @@ function blockStatement(curr_idx){
         },
         curr_idx : curr_idx
     };
+}
+
+function ifStatement(curr_idx){
+    curr_idx = consume(tokenType.LEFT_PAREN, "Expect '(' after 'if'." , curr_idx);
+    const condition_expr = expression(curr_idx);
+    curr_idx = condition_expr.curr_idx;
+    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after if condition.",curr_idx);
+
+    const thenBranch = statement(curr_idx);
+    curr_idx = thenBranch.curr_idx;
+    let elseBranch = null;
+    if (match([tokenType.ELSE], curr_idx)) {
+        curr_idx = consume(tokenType.ELSE, "Expect else branch.", curr_idx);
+        elseBranch = statement(curr_idx);
+    }
+
+    return {
+        statement : {
+            statementType: statementsTypes.STATEMENT_IF,
+            condition_expr : condition_expr,
+            thenBranch : thenBranch,
+            elseBranch : elseBranch,
+        },
+        curr_idx : curr_idx
+    }
+
 }
 
 function expressionStatement(curr_idx) {
