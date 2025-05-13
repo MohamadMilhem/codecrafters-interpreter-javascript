@@ -79,6 +79,10 @@ function statement(curr_idx) {
         curr_idx = consume(tokenType.PRINT, "Expected Print statement.", curr_idx);
         return printStatement(curr_idx);
     }
+    if (match([tokenType.LEFT_BRACE], curr_idx)){
+        curr_idx = consume(tokenType.LEFT_BRACE, "Expected beginning of a block.", curr_idx);
+        return blockStatement(curr_idx);
+    }
     return expressionStatement(curr_idx);
 }
 
@@ -94,6 +98,23 @@ function printStatement(curr_idx) {
         },
         curr_idx: curr_idx,
     }
+}
+
+function blockStatement(curr_idx){
+    const statements = [];
+    while(!check(tokenType.RIGHT_BRACE, curr_idx) && !isAtEnd(curr_idx)) {
+        const current_statement = declaration(curr_idx);
+        statements.push(current_statement.statement);
+        curr_idx = current_statement.curr_idx;
+    }
+    curr_idx = consume(tokenType.RIGHT_BRACE, "Expect '}' after block." , curr_idx);
+    return {
+        statement: {
+            statementType: statementsTypes.STATEMENT_BLOCK,
+            statements: statements,
+        },
+        curr_idx : curr_idx
+    };
 }
 
 function expressionStatement(curr_idx) {

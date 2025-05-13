@@ -8,7 +8,7 @@ import {EvaluationError, ParseError, TokenizationError} from "./utils/error-hand
 import {commands} from "./constants/commands.js";
 import {EXIT_CODE} from "./constants/exit-code.js";
 import {statementsTypes} from "./constants/statements-types.js";
-import {define} from "./utils/enviroment.js";
+import {createInnerEnv, define, destroyInnerEnv, nested_envs} from "./utils/enviroment.js";
 
 
 function main() {
@@ -112,6 +112,15 @@ function executeStatement(statement){
     }
 
     define(statement.nameToken.text, value);
+    return null;
+  }
+  else if (statement.statementType === statementsTypes.STATEMENT_BLOCK){
+    let statements = statement.statements;
+    createInnerEnv();
+    for (let statement of statements) {
+      executeStatement(statement);
+    }
+    destroyInnerEnv();
     return null;
   }
 }
