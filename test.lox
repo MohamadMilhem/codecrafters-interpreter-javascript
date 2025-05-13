@@ -1,9 +1,7 @@
-var stage = "unknown";
-var age = 50;
-if (age < 18) { stage = "child"; }
-if (age >= 18) { stage = "adult"; }
-print stage;
+if (false) {
+  print "if block";
+} else print "else statement";
 
-var isAdult = age >= 18;
-if (isAdult) { print "eligible for voting: true"; }
-if (!isAdult) { print "eligible for voting: false"; }
+if (false) print "if statement"; else {
+  print "else block";
+}

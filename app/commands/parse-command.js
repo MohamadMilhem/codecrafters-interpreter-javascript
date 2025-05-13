@@ -133,6 +133,7 @@ function ifStatement(curr_idx){
     if (match([tokenType.ELSE], curr_idx)) {
         curr_idx = consume(tokenType.ELSE, "Expect else branch.", curr_idx);
         elseBranch = statement(curr_idx);
+        curr_idx = elseBranch.curr_idx;
     }
 
     return {
