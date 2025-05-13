@@ -259,7 +259,7 @@ function and(curr_idx){
                 name : "logical",
                 expression : expression.expr,
                 operator : operator,
-                right : right.expression,
+                right : right.expr,
             },
             curr_idx: curr_idx
         }

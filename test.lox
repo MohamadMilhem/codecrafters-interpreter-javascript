@@ -1,8 +1,7 @@
-if (false or "ok") print "baz";
-if (nil or "ok") print "baz";
+if (false and "bad") print "foo";
+if (nil and "bad") print "foo";
 
-if (false or false) print "world";
-if (true or "world") print "world";
-
-if (24 or "bar") print "bar";
-if ("bar" or "bar") print "bar";
+if (true and "hello") print "hello";
+if (97 and "baz") print "baz";
+if ("baz" and "baz") print "baz";
+if ("" and "bar") print "bar";
