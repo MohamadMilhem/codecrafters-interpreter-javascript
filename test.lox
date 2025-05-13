@@ -1,7 +1,12 @@
-if (false and "bad") print "foo";
-if (nil and "bad") print "foo";
+var n = 10;
+var fm = 0;
+var fn = 1;
+var index = 0;
 
-if (true and "hello") print "hello";
-if (97 and "baz") print "baz";
-if ("baz" and "baz") print "baz";
-if ("" and "bar") print "bar";
+while (index < n) {
+  print fm;
+  var temp = fm;
+  fm = fn;
+  fn = temp + fn;
+  index = index + 1;
+}

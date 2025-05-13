@@ -131,6 +131,12 @@ function executeStatement(statement){
     }
     return null;
   }
+  else if (statement.statementType === statementsTypes.STATEMENT_WHILE){
+    while(isTruthy(evaluate(statement.condition_expr.expr))){
+      executeStatement(statement.body.statement);
+    }
+    return null;
+  }
 }
 
 /**

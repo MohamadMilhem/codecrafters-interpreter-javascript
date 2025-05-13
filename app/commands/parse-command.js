@@ -87,6 +87,10 @@ function statement(curr_idx) {
         curr_idx = consume(tokenType.IF, "Expected if statement.", curr_idx);
         return ifStatement(curr_idx);
     }
+    if (match([tokenType.WHILE], curr_idx)){
+        curr_idx = consume(tokenType.WHILE, "Expected while statement.", curr_idx);
+        return whileStatement(curr_idx);
+    }
     return expressionStatement(curr_idx);
 }
 
@@ -146,6 +150,24 @@ function ifStatement(curr_idx){
         curr_idx : curr_idx
     }
 
+}
+
+function whileStatement(curr_idx){
+    curr_idx = consume(tokenType.LEFT_PAREN, "Expect '(' after 'if'." , curr_idx);
+    const condition_expr = expression(curr_idx);
+    curr_idx = condition_expr.curr_idx;
+    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after if condition.",curr_idx);
+
+    const body = statement(curr_idx);
+    curr_idx = body.curr_idx;
+    return {
+        statement : {
+            statementType: statementsTypes.STATEMENT_WHILE,
+            condition_expr : condition_expr,
+            body : body,
+        },
+        curr_idx : curr_idx
+    }
 }
 
 function expressionStatement(curr_idx) {

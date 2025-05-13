@@ -4,4 +4,5 @@ export const statementsTypes = {
     STATEMENT_VAR_DEC : 2,
     STATEMENT_BLOCK : 3,
     STATEMENT_IF : 4,
+    STATEMENT_WHILE : 5,
 }
