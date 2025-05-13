@@ -196,7 +196,7 @@ function expression(curr_idx) {
 }
 
 function assignment(curr_idx) {
-    const expression = equality(curr_idx);
+    const expression = or(curr_idx);
     curr_idx = expression.curr_idx;
 
     if (match([tokenType.EQUAL], curr_idx)) {
@@ -221,6 +221,52 @@ function assignment(curr_idx) {
     }
     return expression;
 }
+
+function or(curr_idx){
+    let expression = and(curr_idx);
+    curr_idx = expression.curr_idx;
+
+    while(match([tokenType.OR], curr_idx)){
+        curr_idx = consume(tokenType.OR, "OR", curr_idx);
+        const operator = previous(curr_idx);
+        const right = and(curr_idx);
+        curr_idx = right.curr_idx;
+        expression = {
+            expr : {
+                    name : "logical",
+                    expression : expression.expr,
+                    operator : operator,
+                    right : right.expr,
+            },
+            curr_idx : curr_idx
+        }
+    }
+
+    return expression;
+}
+
+function and(curr_idx){
+    let expression = equality(curr_idx);
+    curr_idx = expression.curr_idx;
+
+    while(match([tokenType.AND], curr_idx)){
+        curr_idx = consume(tokenType.AND, "AND", curr_idx);
+        const operator = previous(curr_idx);
+        const right = equality(curr_idx);
+        curr_idx = right.curr_idx;
+        expression = {
+            expr : {
+                name : "logical",
+                expression : expression.expr,
+                operator : operator,
+                right : right.expression,
+            },
+            curr_idx: curr_idx
+        }
+    }
+    return expression;
+}
+
 
 function equality(curr_idx) {
     try {

@@ -31,6 +31,8 @@ export function evaluate(expr) {
             return evaluateVariable(expr);
         case "assignment":
             return evaluateAssignment(expr);
+        case "logical":
+            return evaluateLogical(expr);
         default:
             return null;
     }
@@ -162,6 +164,18 @@ function evaluateAssignment(expr){
     return value;
 }
 
+function evaluateLogical(expr){
+    let left = evaluate(expr.expression);
+
+    if (expr.operator.type === tokenType.OR){
+        if (isTruthy(left))
+            return left;
+    } else {
+        if (!isTruthy(left))
+            return left;
+    }
+    return evaluate(expr.right);
+}
 
 export function isTruthy(expression) {
     if (expression === null) return false;

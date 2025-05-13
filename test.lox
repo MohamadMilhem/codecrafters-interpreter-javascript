@@ -1,7 +1,8 @@
-if (false) {
-  print "if block";
-} else print "else statement";
+if (false or "ok") print "baz";
+if (nil or "ok") print "baz";
 
-if (false) print "if statement"; else {
-  print "else block";
-}
+if (false or false) print "world";
+if (true or "world") print "world";
+
+if (24 or "bar") print "bar";
+if ("bar" or "bar") print "bar";
