@@ -593,8 +593,59 @@ function unary(curr_idx) {
         }
     }
 
-    return primary(curr_idx);
+    return call(curr_idx);
 }
+
+function call(curr_idx) {
+    let expr = primary(curr_idx);
+    curr_idx = expr.curr_idx;
+
+    while(true){
+        if (match([tokenType.LEFT_PAREN], curr_idx)){
+            curr_idx = consume(tokenType.LEFT_PAREN, "", curr_idx);
+            expr = finishCall(expr.expr ,curr_idx);
+            curr_idx = expr.curr_idx;
+        } else {
+            break;
+        }
+    }
+
+    return expr;
+}
+
+function finishCall(callee, curr_idx){
+    let callee_arguments = [];
+    if (!(check(tokenType.RIGHT_PAREN, curr_idx))){
+        do {
+            if (callee_arguments.length >= 255){
+                let curr_token = tokens[curr_idx];
+                error(curr_token.line, "RunTimeError", "Can't have more than 255 arguments.");
+            }
+            let argument = expression(curr_idx);
+            curr_idx = argument.curr_idx;
+            callee_arguments.push(argument.expr);
+            if (!match([tokenType.COMMA], curr_idx)) {
+                break;
+            }
+            curr_idx = consume(tokenType.COMMA, "", curr_idx);
+        } while(true);
+    }
+
+
+    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after arguments.", curr_idx);
+    let paren = previous(curr_idx);
+
+    return {
+      expr: {
+          name: "call",
+          callee: callee,
+          paren: paren,
+          callee_arguments: callee_arguments
+      },
+      curr_idx : curr_idx
+    };
+}
+
 
 function primary(curr_idx) {
     if (match([tokenType.FALSE], curr_idx)) {

@@ -1,11 +1,11 @@
-import {parseCommand} from "./parse-command.js";
 import {error, plainError} from "../utils/logger.js";
 import {EvaluationError} from "../utils/error-handler.js";
 import {tokenType} from "../constants/token-type.js";
 import {EXIT_CODE} from "../constants/exit-code.js";
-import {assign, define, get} from "../utils/enviroment.js";
+import {define, assign, get} from "../utils/enviroment.js";
 
 export function evaluateCommand(expr) {
+    addNativeFunctions();
     try {
         let result = evaluate(expr);
         return (result !== null ? result : "nil");
@@ -33,11 +33,33 @@ export function evaluate(expr) {
             return evaluateAssignment(expr);
         case "logical":
             return evaluateLogical(expr);
+        case "call":
+            return evaluateCall(expr);
         default:
             return null;
     }
+}
 
+function evaluateCall(expr){
+    let callee = evaluate(expr.callee);
 
+    let callee_args = [];
+
+    for (let argument of expr.callee_arguments){
+        callee_args.push(evaluate(argument));
+    }
+
+    if (!('call' in callee)){
+        plainError("Can only call functions and classes.");
+        process.exit(EXIT_CODE.RUNTIME_ERROR);
+    }
+
+    let fun = callee;
+    if (fun.arity() !== callee_args.length){
+        error(expr.paren.line, "RunTimeError", "Expected " + fun.arity() + " arguments but got " + callee_args.length + " arguments.");
+    }
+
+    return fun.call(callee_args);
 }
 
 function evaluateVariable(expr) {
@@ -104,7 +126,13 @@ function evaluatingBinaryExpr(binaryExpr) {
                 throw new EvaluationError("Both operands must be numbers.");
 
             case tokenType.SLASH:
-                if (checkOperatorAvailability(binaryExpr.operator, left, right)) return left / right;
+                if (checkOperatorAvailability(binaryExpr.operator, left, right)){
+                    if (Number.isInteger(left) && Number.isInteger(right)){
+                        return Math.floor(left / right);
+                    } else {
+                        return left / right;
+                    }
+                }
                 throw new EvaluationError("Both operands must be numbers.");
 
             case tokenType.STAR:
@@ -175,6 +203,16 @@ function evaluateLogical(expr){
             return left;
     }
     return evaluate(expr.right);
+}
+
+function addNativeFunctions(){
+    define("clock", {
+        arity: () => { return 0; },
+        toString: () => {return "<native fn>";},
+        call: (args) => {
+            return Math.floor(Date.now() / 1000);
+        },
+    });
 }
 
 export function isTruthy(expression) {
