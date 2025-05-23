@@ -127,7 +127,7 @@ function evaluatingBinaryExpr(binaryExpr) {
             case tokenType.SLASH:
                 if (checkOperatorAvailability(binaryExpr.operator, left, right)){
                     if (Number.isInteger(left) && Number.isInteger(right)){
-                        return Math.floor(left / right);
+                        return left / right;
                     } else {
                         return left / right;
                     }
