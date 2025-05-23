@@ -8,7 +8,14 @@ import {EvaluationError, ParseError, TokenizationError} from "./utils/error-hand
 import {commands} from "./constants/commands.js";
 import {EXIT_CODE} from "./constants/exit-code.js";
 import {statementsTypes} from "./constants/statements-types.js";
-import {createInnerEnv, define, destroyInnerEnv, nested_envs} from "./utils/enviroment.js";
+import {
+  createEnvironmentWithParent,
+  createInnerEnv,
+  define,
+  destroyInnerEnv,
+  globals,
+  withEnvironment
+} from "./utils/enviroment.js";
 
 
 function main() {
@@ -135,6 +142,21 @@ function executeStatement(statement){
     while(isTruthy(evaluate(statement.condition_expr.expr))){
       executeStatement(statement.body.statement);
     }
+    return null;
+  }
+  else if (statement.statementType === statementsTypes.STATEMENT_FUNC){
+    define(statement.nameToken.text, {
+      arity: () => {return statement.parameters.length;},
+      toString: () => {return "<fn " + statement.nameToken.text + ">";},
+      call: (args) => {
+        const environment = createEnvironmentWithParent(globals);
+        for (let i = 0 ; i < statement.parameters.length ; i++){
+          environment.define(statement.parameters[i].text, args[i]);
+        }
+        withEnvironment(environment, () => { return executeStatement(statement.body); } );
+        return null;
+      }
+    });
     return null;
   }
 }

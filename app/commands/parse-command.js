@@ -4,6 +4,7 @@ import {ParseError} from "../utils/error-handler.js";
 import {error, plainError, parseError} from "../utils/logger.js";
 import {statementsTypes} from "../constants/statements-types.js";
 import {errorType} from "../constants/error-type.js";
+import {define} from "../utils/enviroment.js";
 
 export let errorsCountParse = 0;
 let tokens = [];
@@ -14,7 +15,7 @@ export function parseCommand(_tokens) {
     let statements = [];
     let curr_statement = null;
     let curr_idx = 0;
-
+    addNativeFunctions();
     do {
         curr_statement = declaration(curr_idx);
         statements.push(curr_statement.statement);
@@ -35,6 +36,10 @@ export function parseCommand(_tokens) {
 
 function declaration(curr_idx) {
     try {
+        if (match([tokenType.FUN], curr_idx)) {
+            curr_idx = consume(tokenType.FUN, "", curr_idx);
+            return functionDeclaration("function",curr_idx);
+        }
         if (match([tokenType.VAR], curr_idx)) {
             curr_idx = consume(tokenType.VAR, "" ,curr_idx);
             return varDeclaration(curr_idx);
@@ -45,6 +50,45 @@ function declaration(curr_idx) {
         return null;
     }
 }
+
+function functionDeclaration(kind ,curr_idx) {
+    curr_idx = consume(tokenType.IDENTIFIER, "Expect " + kind + " name.", curr_idx);
+    let nameToken = previous(curr_idx);
+
+    curr_idx = consume(tokenType.LEFT_PAREN, "Expect '(' after " + kind + " name.", curr_idx);
+    let parameters = [];
+
+    if (!check(tokenType.RIGHT_PAREN, curr_idx)){
+        do {
+            if (parameters.length >= 255){
+                let curr_token = peek(curr_idx);
+                error(curr_token.line, "ParseError", "Can't have more than 255 parameters.");
+            }
+            curr_idx = consume(tokenType.IDENTIFIER, "Expect parameter name.", curr_idx);
+            parameters.push(previous(curr_idx));
+            if (!match([tokenType.COMMA], curr_idx)){
+                break;
+            }
+            curr_idx = consume(tokenType.COMMA, "", curr_idx);
+        } while(true);
+    }
+
+    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after parameters.", curr_idx);
+    curr_idx = consume(tokenType.LEFT_BRACE, "Expect '{' before " + kind + " body." ,curr_idx);
+    let body = blockStatement(curr_idx);
+    curr_idx = body.curr_idx;
+    return {
+        statement: {
+            statementType: statementsTypes.STATEMENT_FUNC,
+            nameToken: nameToken,
+            parameters: parameters,
+            body: body.statement,
+        },
+        curr_idx : curr_idx,
+    }
+
+}
+
 
 function varDeclaration(curr_idx) {
     if (!match([tokenType.IDENTIFIER], curr_idx)) {
@@ -736,6 +780,16 @@ function primary(curr_idx) {
         },
         curr_idx
     };
+}
+
+function addNativeFunctions(){
+    define("clock", {
+        arity: () => { return 0; },
+        toString: () => {return "<native fn>";},
+        call: (args) => {
+            return Math.floor(Date.now() / 1000);
+        },
+    });
 }
 
 function consume(type, message, curr_idx) {

@@ -5,7 +5,6 @@ import {EXIT_CODE} from "../constants/exit-code.js";
 import {define, assign, get} from "../utils/enviroment.js";
 
 export function evaluateCommand(expr) {
-    addNativeFunctions();
     try {
         let result = evaluate(expr);
         return (result !== null ? result : "nil");
@@ -205,15 +204,6 @@ function evaluateLogical(expr){
     return evaluate(expr.right);
 }
 
-function addNativeFunctions(){
-    define("clock", {
-        arity: () => { return 0; },
-        toString: () => {return "<native fn>";},
-        call: (args) => {
-            return Math.floor(Date.now() / 1000);
-        },
-    });
-}
 
 export function isTruthy(expression) {
     if (expression === null) return false;
