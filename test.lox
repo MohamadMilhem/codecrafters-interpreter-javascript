@@ -1,6 +1,11 @@
-fun fib(n) {
-  if (n < 2) return n;
-  return fib(n - 2) + fib(n - 1);
+var globalGreeting = "Hello";
+
+fun makeGreeter() {
+  fun greet(name) {
+    print globalGreeting + " " + name;
+  }
+  return greet;
 }
 
-print fib(32);
+var sayHello = makeGreeter();
+sayHello("Bob");

@@ -12,7 +12,7 @@ import {
   createEnvironmentWithParent,
   createInnerEnv,
   define,
-  destroyInnerEnv,
+  destroyInnerEnv, getCurrentEnv,
   globals,
   withEnvironment
 } from "./utils/enviroment.js";
@@ -146,10 +146,11 @@ function executeStatement(statement){
   }
   else if (statement.statementType === statementsTypes.STATEMENT_FUNC){
     define(statement.nameToken.text, {
+      closure: getCurrentEnv(),
       arity: () => {return statement.parameters.length;},
       toString: () => {return "<fn " + statement.nameToken.text + ">";},
-      call: (args) => {
-        const environment = createEnvironmentWithParent(globals);
+      call(args) {
+        const environment = createEnvironmentWithParent(this.closure);
         for (let i = 0 ; i < statement.parameters.length ; i++){
           environment.define(statement.parameters[i].text, args[i]);
         }
