@@ -123,6 +123,10 @@ function statement(curr_idx) {
         curr_idx = consume(tokenType.PRINT, "Expected Print statement.", curr_idx);
         return printStatement(curr_idx);
     }
+    if (match([tokenType.RETURN], curr_idx)){
+        curr_idx = consume(tokenType.RETURN, "Expected Return statement.", curr_idx);
+        return returnStatement(curr_idx);
+    }
     if (match([tokenType.LEFT_BRACE], curr_idx)){
         curr_idx = consume(tokenType.LEFT_BRACE, "Expected beginning of a block.", curr_idx);
         return blockStatement(curr_idx);
@@ -155,6 +159,26 @@ function printStatement(curr_idx) {
         curr_idx: curr_idx,
     }
 }
+
+function returnStatement(curr_idx){
+    let keyword = previous(curr_idx);
+    let value = null;
+
+    if (!check(tokenType.SEMICOLON, curr_idx)){
+        value = expression(curr_idx);
+        curr_idx = value.curr_idx;
+    }
+
+    curr_idx = consume(tokenType.SEMICOLON, "Expect ';' after return value." ,curr_idx);
+    return {
+        statement: {
+            statementType : statementsTypes.STATEMENT_RETURN,
+            exprValue : value?.expr ?? null,
+        },
+        curr_idx: curr_idx,
+    }
+}
+
 
 function blockStatement(curr_idx){
     const statements = [];

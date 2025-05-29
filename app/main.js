@@ -4,7 +4,7 @@ import {parseCommand} from "./commands/parse-command.js";
 import {evaluate, evaluateCommand, isTruthy} from "./commands/evaluate-command.js";
 import {error, plainError, printTokens} from "./utils/logger.js";
 import {astPrint} from "./utils/ast-printer.js";
-import {EvaluationError, ParseError, TokenizationError} from "./utils/error-handler.js";
+import {EvaluationError, ParseError, Return, TokenizationError} from "./utils/error-handler.js";
 import {commands} from "./constants/commands.js";
 import {EXIT_CODE} from "./constants/exit-code.js";
 import {statementsTypes} from "./constants/statements-types.js";
@@ -153,11 +153,27 @@ function executeStatement(statement){
         for (let i = 0 ; i < statement.parameters.length ; i++){
           environment.define(statement.parameters[i].text, args[i]);
         }
-        withEnvironment(environment, () => { return executeStatement(statement.body); } );
+        try {
+          withEnvironment(environment, () => {
+            return executeStatement(statement.body);
+          });
+        } catch (e){
+          if (e instanceof Return){
+            return e.value;
+          }
+        }
         return null;
       }
     });
     return null;
+  }
+  else if (statement.statementType === statementsTypes.STATEMENT_RETURN){
+    let value = null;
+    if (statement.exprValue !== null){
+      value = evaluateCommand(statement.exprValue);
+    }
+
+    throw new Return(value);
   }
 }
 

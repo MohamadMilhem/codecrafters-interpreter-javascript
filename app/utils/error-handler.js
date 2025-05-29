@@ -22,3 +22,10 @@ export class EvaluationError extends Error {
         this.name = "EvaluationError";
     }
 }
+
+export class Return extends Error {
+    constructor(value) {
+        super();
+        this.value = value;
+    }
+}

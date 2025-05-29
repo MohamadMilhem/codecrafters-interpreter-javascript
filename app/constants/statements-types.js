@@ -6,4 +6,5 @@ export const statementsTypes = {
     STATEMENT_IF : 4,
     STATEMENT_WHILE : 5,
     STATEMENT_FUNC : 6,
+    STATEMENT_RETURN: 7
 }

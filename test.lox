@@ -1,16 +1,6 @@
-var celsius = 86;
-var fahrenheit = 0;
-var isHot = false;
-{
-  fahrenheit = celsius * 9 / 5 + 32;
-  print celsius; print fahrenheit;
+fun fib(n) {
+  if (n < 2) return n;
+  return fib(n - 2) + fib(n - 1);
+}
 
-  if (celsius > 30) {
-    isHot = true;
-    print "It's a hot day. Stay hydrated!";
-  } else {
-     print "It's cold today. Wear a jacket!";
-   }
-
-   if (isHot) { print "Use sunscreen!"; }
- }
+print fib(32);
