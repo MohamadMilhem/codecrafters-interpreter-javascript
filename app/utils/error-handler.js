@@ -19,7 +19,7 @@ export class EvaluationError extends Error {
     constructor(line, message) {
         super(message);
         this.line = line;
-        this.name = "EvaluationError";
+        this.name = "RuntimeError";
     }
 }
 

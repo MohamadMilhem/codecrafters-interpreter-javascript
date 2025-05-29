@@ -55,7 +55,7 @@ function evaluateCall(expr){
 
     let fun = callee;
     if (fun.arity() !== callee_args.length){
-        error(expr.paren.line, "RunTimeError", "Expected " + fun.arity() + " arguments but got " + callee_args.length + " arguments.");
+        throw new EvaluationError(expr.paren.line, "RunTimeError: Expected " + fun.arity() + " arguments but got " + callee_args.length + " arguments.");
     }
 
     return fun.call(callee_args);
