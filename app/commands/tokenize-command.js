@@ -1,222 +1,157 @@
 import { tokenType } from '../constants/token-type.js';
 import { errorType } from "../constants/error-type.js";
-import { error } from "../utils/logger.js";
-import {keywords} from "../constants/keywords.js";
-import {TokenizationError} from "../utils/error-handler.js";
-import {errorsCountParse} from "./parse-command.js";
+import { keywords } from "../constants/keywords.js";
 
-const tokens = []
-export let errorsCountTokenize = 0;
-let skipNext = false, comment = false;
-let lineNumber = 1, curr_char_idx = 0;
-let fileLength = 0;
-let file;
-export function tokenizeCommand(fileContent) {
-    fileLength = fileContent.length;
-    file = fileContent;
+/**
+ * Tokenizes the input file content in a pure, functional style.
+ * @param {string} fileContent - The source code to tokenize.
+ * @returns {{ tokens: Array, errors: Array }}
+ */
+export const tokenizeCommand = (fileContent) => {
+    const fileLength = fileContent.length;
+    let tokens = [];
+    let errors = [];
+    let lineNumber = 1;
+    let currCharIdx = 0;
+    let skipNext = false;
+    let comment = false;
 
-    for (curr_char_idx = 0; curr_char_idx < fileLength; curr_char_idx++) {
-        if (skipNext){
-            skipNext = false;
-            continue;
-        }
-        if (comment && fileContent[curr_char_idx] !== '\n')continue;
-        checkCharacter(fileContent[curr_char_idx]);
-    }
-
-    addToken(tokenType.EOF);
-
-    return {
-        tokens: tokens,
-        hasErrors: errorsCountTokenize > 0,
-        errorCount: errorsCountTokenize,
+    const addToken = (type, text = "", value = null) => {
+        tokens = [...tokens, { type, text, value, line: lineNumber }];
     };
-}
 
-function checkCharacter(character) {
-    switch (character) {
-        case '(':
-            addToken(tokenType.LEFT_PAREN, character);
-            break;
-        case ')':
-            addToken(tokenType.RIGHT_PAREN, character);
-            break;
-        case '{':
-            addToken(tokenType.LEFT_BRACE, character);
-            break;
-        case '}':
-            addToken(tokenType.RIGHT_BRACE, character);
-            break;
-        case ',':
-            addToken(tokenType.COMMA, character);
-            break;
-        case '.':
-            addToken(tokenType.DOT, character);
-            break;
-        case '-':
-            addToken(tokenType.MINUS, character);
-            break;
-        case '+':
-            addToken(tokenType.PLUS, character);
-            break;
-        case ';':
-            addToken(tokenType.SEMICOLON, character);
-            break;
-        case '*':
-            addToken(tokenType.STAR, character);
-            break;
-        case '!':
-            addToken(match('=') ? tokenType.BANG_EQUAL : tokenType.BANG,
-                character + (match('=') ? '=' : ''));
-            break;
-        case '=':
-            addToken(match('=') ? tokenType.EQUAL_EQUAL : tokenType.EQUAL,
-                character + (match('=') ? '=' : ''));
-            break;
-        case '<':
-            addToken(match('=') ? tokenType.LESS_EQUAL : tokenType.LESS,
-                character + (match('=') ? '=' : ''));
-            break;
-        case '>':
-            addToken(match('=') ? tokenType.GREATER_EQUAL : tokenType.GREATER,
-                character + (match('=') ? '=' : ''));
-            break;
-        case '/':
-            if (match('/')){
-                comment = true;
-                break;
-            }
-            addToken(tokenType.SLASH, character);
-            break;
-        case '"':
-            getString();
-            break;
-        case ' ':
-            break;
-        case '\n':
-            lineNumber++;
-            comment = false;
-            break;
-        case '\r':
-            break;
-        case '\t':
-            break;
-        default:
-            if (isDigit(character)){
-                getNumber();
-            }
-            else if (isAlpha(character)){
-                getIdentifier();
-            }
-            else {
-                error(lineNumber, errorType.UNEXPECTED_CHAR, character);
-                errorsCountTokenize++;
-                return;
-            }
-            break;
-    }
-}
+    const errorToken = (line, type, text = "") => {
+        errors = [...errors, { line, type, text }];
+    };
 
-function isDigit(char) {
-    return char >= '0' && char <= '9';
-}
+    const isDigit = (char) => char >= '0' && char <= '9';
+    const isAlpha = (char) => (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char === '_');
+    const isAlphaNumeric = (char) => isDigit(char) || isAlpha(char);
 
-function isAlpha(char) {
-    return (char >= 'a' && char <= 'z')
-        || (char >= 'A' && char <= 'Z')
-        || (char === '_');
-}
+    const getCurrentChar = () => (currCharIdx >= fileLength ? '\0' : fileContent[currCharIdx]);
+    const getNextChar = () => (currCharIdx + 1 >= fileLength ? '\0' : fileContent[currCharIdx + 1]);
+    const moveToNextChar = () => { currCharIdx++; };
 
-function isAlphaNumeric(char) {
-    return isDigit(char) || isAlpha(char);
-}
+    const match = (expected) => {
+        if (getNextChar() !== expected) return false;
+        skipNext = true;
+        return true;
+    };
 
-function getIdentifier() {
-    let identifier_chars = [];
-    identifier_chars.push(getCurrentChar());
-    while(isAlphaNumeric(getNextChar())){
-        moveToNextChar();
-        identifier_chars.push(getCurrentChar());
-    }
-
-    let text = identifier_chars.join('');
-    let current_tokenType = keywords.get(text);
-    if (current_tokenType === undefined) {
-        current_tokenType = tokenType.IDENTIFIER;
-    }
-    addToken(current_tokenType, text);
-}
-
-function getNumber(){
-    let number_digits = [];
-    number_digits.push(getCurrentChar());
-    while(isDigit(getNextChar())){
-        moveToNextChar()
-        number_digits.push(getCurrentChar());
-    }
-
-    if (getNextChar() === '.') {
-        moveToNextChar();
-        number_digits.push(getCurrentChar());
-        while(isDigit(getNextChar())){
+    const getIdentifier = () => {
+        let identifierChars = [getCurrentChar()];
+        while (isAlphaNumeric(getNextChar())) {
             moveToNextChar();
-            number_digits.push(getCurrentChar());
+            identifierChars.push(getCurrentChar());
         }
-    }
+        let text = identifierChars.join('');
+        let currentTokenType = keywords.get(text) || tokenType.IDENTIFIER;
+        addToken(currentTokenType, text);
+    };
 
-    let lexeme = number_digits.join('');
-    let literal = parseFloat(lexeme);
+    const getNumber = () => {
+        let numberDigits = [getCurrentChar()];
+        while (isDigit(getNextChar())) {
+            moveToNextChar();
+            numberDigits.push(getCurrentChar());
+        }
+        if (getNextChar() === '.') {
+            moveToNextChar();
+            numberDigits.push(getCurrentChar());
+            while (isDigit(getNextChar())) {
+                moveToNextChar();
+                numberDigits.push(getCurrentChar());
+            }
+        }
+        let lexeme = numberDigits.join('');
+        let literal = parseFloat(lexeme);
+        addToken(tokenType.NUMBER, lexeme, literal);
+    };
 
-    addToken(tokenType.NUMBER, lexeme, literal);
-
-}
-
-function getString() {
-    let chars_in_string = [];
-    chars_in_string.push(getCurrentChar());
-    moveToNextChar();
-    while(curr_char_idx < fileLength && getCurrentChar() !== '"'){
-        chars_in_string.push(getCurrentChar());
-        if (getCurrentChar() === '\n')
-            lineNumber++;
+    const getString = () => {
+        let charsInString = [getCurrentChar()];
         moveToNextChar();
+        while (currCharIdx < fileLength && getCurrentChar() !== '"') {
+            charsInString.push(getCurrentChar());
+            if (getCurrentChar() === '\n') lineNumber++;
+            moveToNextChar();
+        }
+        if (currCharIdx === fileLength) {
+            errorToken(lineNumber, errorType.UNTERMINATED_STRING);
+            return;
+        }
+        charsInString.push(getCurrentChar());
+        let nameOfText = charsInString.join('');
+        let valueOfText = nameOfText.substring(1, nameOfText.length - 1);
+        addToken(tokenType.STRING, nameOfText, valueOfText);
+    };
+
+    const checkCharacter = (character) => {
+        switch (character) {
+            case '(': addToken(tokenType.LEFT_PAREN, character); break;
+            case ')': addToken(tokenType.RIGHT_PAREN, character); break;
+            case '{': addToken(tokenType.LEFT_BRACE, character); break;
+            case '}': addToken(tokenType.RIGHT_BRACE, character); break;
+            case ',': addToken(tokenType.COMMA, character); break;
+            case '.': addToken(tokenType.DOT, character); break;
+            case '-': addToken(tokenType.MINUS, character); break;
+            case '+': addToken(tokenType.PLUS, character); break;
+            case ';': addToken(tokenType.SEMICOLON, character); break;
+            case '*': addToken(tokenType.STAR, character); break;
+            case '!':
+                if (match('=')) { // Calls match once
+                    addToken(tokenType.BANG_EQUAL, "!=");
+                } else {
+                    addToken(tokenType.BANG, "!");
+                }
+                break;
+            case '=':
+                if (match('=')) { // Calls match once
+                    addToken(tokenType.EQUAL_EQUAL, "==");
+                } else {
+                    addToken(tokenType.EQUAL, "=");
+                }
+                break;
+            case '<':
+                if (match('=')) { // Calls match once
+                    addToken(tokenType.LESS_EQUAL, "<=");
+                } else {
+                    addToken(tokenType.LESS, "<");
+                }
+                break;
+            case '>':
+                if (match('=')) { // Calls match once
+                    addToken(tokenType.GREATER_EQUAL, ">=");
+                } else {
+                    addToken(tokenType.GREATER, ">");
+                }
+                break;
+            case '/':
+                if (match('/')) { // Correctly handles comments
+                    comment = true;
+                    // skipNext is true (set by match), so the main loop will skip the second '/'
+                    break;
+                }
+                addToken(tokenType.SLASH, character);
+                break;
+            case '"': getString(); break;
+            case ' ': break;
+            case '\n': lineNumber++; comment = false; break;
+            case '\r': break;
+            case '\t': break;
+            default:
+                if (isDigit(character)) { getNumber(); }
+                else if (isAlpha(character)) { getIdentifier(); }
+                else { errorToken(lineNumber, errorType.UNEXPECTED_CHAR, character); }
+                break;
+        }
+    };
+
+    for (currCharIdx = 0; currCharIdx < fileLength; currCharIdx++) {
+        if (skipNext) { skipNext = false; continue; }
+        if (comment && fileContent[currCharIdx] !== '\n') continue;
+        checkCharacter(fileContent[currCharIdx]);
     }
-
-    if (curr_char_idx === fileLength) {
-        error(lineNumber, errorType.UNTERMINATED_STRING);
-        errorsCountTokenize++;
-        return;
-    }
-
-    chars_in_string.push(getCurrentChar());
-    let nameOfText = chars_in_string.join('');
-    let valueOfText = nameOfText.substring(1 ,nameOfText.length - 1);
-    addToken(tokenType.STRING, nameOfText, valueOfText);
-}
-
-
-function match(expected) {
-    if (getNextChar() !== expected) return false;
-    skipNext = true;
-    return true;
-}
-
-
-function addToken(tokenType, text="", value=null) {
-    tokens.push({type: tokenType, text: text, value: value, line: lineNumber});
-}
-
-
-function getCurrentChar(){
-    if (curr_char_idx >= file.length) return '\0';
-    return file[curr_char_idx];
-}
-
-function getNextChar(){
-    if (curr_char_idx + 1 >= file.length) return '\0';
-    return file[curr_char_idx + 1];
-}
-
-function moveToNextChar(){
-    curr_char_idx++;
-}
+    addToken(tokenType.EOF);
+    return { tokens, errors };
+};

@@ -20,7 +20,7 @@ import {
 
 function main() {
   const args = process.argv.slice(2);
-  //let args = ["run", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+  //let args = ["tokenize", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
 
   if (args.length < 2) {
     console.error("Usage: ./your_program.sh tokenize|parse|evaluate <filename>");
@@ -46,19 +46,20 @@ function main() {
  */
 function executeCommand(command, fileContent) {
   // Always tokenize first regardless of command
-  const tokenizeResult = runTokenizer(fileContent);
+  const { tokens, errors: tokenizeErrors } = runTokenizer(fileContent);
 
   // For tokenize command, we're done
   if (command === commands.TOKENIZE) {
-    printTokens(tokenizeResult.tokens);
-    if (tokenizeResult.hasErrors) {
+    printTokens(tokens);
+    if (tokenizeErrors.length > 0) {
+      tokenizeErrors.forEach(err => error(err.line, err.type, err.text));
       process.exit(EXIT_CODE.SYNTAX_ERROR);
     }
     process.exit(EXIT_CODE.SUCCESS);
   }
 
   // Parse the tokens if needed
-  const parseResult = runParser(tokenizeResult.tokens);
+  const parseResult = runParser(tokens);
 
   if (parseResult.hasErrors) {
     process.exit(EXIT_CODE.SYNTAX_ERROR);
