@@ -20,7 +20,7 @@ import {
 
 function main() {
   const args = process.argv.slice(2);
-  //let args = ["tokenize", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
+  //let args = ["run", "C:\\Repos\\LoxInterpreter\\codecrafters-interpreter-javascript\\test.lox"];
 
   if (args.length < 2) {
     console.error("Usage: ./your_program.sh tokenize|parse|evaluate <filename>");
@@ -51,19 +51,20 @@ function executeCommand(command, fileContent) {
   // For tokenize command, we're done
   if (command === commands.TOKENIZE) {
     printTokens(tokens);
-    if (tokenizeErrors.length > 0) {
-      tokenizeErrors.forEach(err => error(err.line, err.type, err.text));
-      process.exit(EXIT_CODE.SYNTAX_ERROR);
-    }
+  }
+
+  if (tokenizeErrors.length > 0) {
+    tokenizeErrors.forEach(err => error(err.line, err.type, err.text));
+    process.exit(EXIT_CODE.SYNTAX_ERROR);
+  }
+
+  if (command === commands.TOKENIZE){
     process.exit(EXIT_CODE.SUCCESS);
   }
 
+
   // Parse the tokens if needed
   const parseResult = runParser(tokens);
-
-  if (parseResult.hasErrors) {
-    process.exit(EXIT_CODE.SYNTAX_ERROR);
-  }
 
   // For parse command, we're done
   if (command === commands.PARSE) {
@@ -203,16 +204,16 @@ function runTokenizer(fileContent) {
  * @returns {Object} The parsing result
  */
 function runParser(tokens) {
-  try {
-    return parseCommand(tokens);
-  } catch (e) {
-    if (e instanceof ParseError) {
-      plainError(`Unexpected error during parsing: ${e.message}`);
-    } else {
-      plainError(`Unexpected error: ${e.message}`);
+  let parseResult = parseCommand(tokens);
+
+  if (parseResult.errors.length) {
+    for (let parseError of parseResult.errors) {
+      error(parseError.expression.line, "ParseError", parseError.message);
     }
     process.exit(EXIT_CODE.SYNTAX_ERROR);
   }
+
+  return parseResult;
 }
 
 // Start the program

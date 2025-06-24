@@ -1,82 +1,166 @@
-import {errorsCountTokenize, tokenizeCommand} from "./tokenize-command.js";
 import {tokenType} from "../constants/token-type.js";
 import {ParseError} from "../utils/error-handler.js";
-import {error, plainError, parseError} from "../utils/logger.js";
+import {error, parseError} from "../utils/logger.js";
 import {statementsTypes} from "../constants/statements-types.js";
 import {errorType} from "../constants/error-type.js";
 import {define} from "../utils/enviroment.js";
 
-export let errorsCountParse = 0;
-let tokens = [];
 
-export function parseCommand(_tokens) {
+export function parseCommand(tokens) {
 
-    tokens = _tokens;
-    let statements = [];
-    let curr_statement = null;
-    let curr_idx = 0;
-    addNativeFunctions();
-    do {
-        curr_statement = declaration(curr_idx);
-        statements.push(curr_statement.statement);
-
-        curr_idx = curr_statement.curr_idx;
-    } while (!isAtEnd(curr_idx));
-
-    if (!isAtEnd(curr_idx)){
-        parseError(peek(curr_idx), "Unexpected tokens after expression.");
-        errorsCountParse++;
+    // Initial state
+    const initialState = {
+        tokens: tokens,
+        currentIdx : 0,
+        errors: [],
     }
+
+    addNativeFunctions();
+    const { statements, finalState } = parseAllStatements(initialState);
+
     return {
         statements: statements,
-        hasErrors: errorsCountParse > 0,
-        errorCount: errorsCountParse,
-    }
+        errors : finalState.errors,
+    };
 }
 
-function declaration(curr_idx) {
-    try {
-        if (match([tokenType.FUN], curr_idx)) {
-            curr_idx = consume(tokenType.FUN, "", curr_idx);
-            return functionDeclaration("function",curr_idx);
+function parseAllStatements(state) {
+    const statements = [];
+    let currentState = state;
+
+    // Recursive loop
+    function loop() {
+        if (isAtEnd(currentState)) {
+            return; // Base case: end of tokens
         }
-        if (match([tokenType.VAR], curr_idx)) {
-            curr_idx = consume(tokenType.VAR, "" ,curr_idx);
-            return varDeclaration(curr_idx);
+
+        const result = declaration(currentState);
+        if (result && result.statement) {
+            statements.push(result.statement);
         }
-        return statement(curr_idx);
-    } catch (e) {
-        synchronize();
-        return null;
+        currentState = result.nextState;
+        loop(); // Recursive step
     }
+
+    loop();
+    return { statements, finalState: currentState };
 }
 
-function functionDeclaration(kind ,curr_idx) {
-    curr_idx = consume(tokenType.IDENTIFIER, "Expect " + kind + " name.", curr_idx);
-    let nameToken = previous(curr_idx);
 
-    curr_idx = consume(tokenType.LEFT_PAREN, "Expect '(' after " + kind + " name.", curr_idx);
+function declaration(state) {
+    let currentState = state;
+
+    let funMatch = match([tokenType.FUN], currentState);
+    if (funMatch.success) {
+        let consumeFunToken = consume(tokenType.FUN, "Expecting 'fun' token.", currentState);
+
+        if (!consumeFunToken.success)
+            return {
+                statement: null,
+                nextState: consumeFunToken.nextState,
+            };
+
+        currentState = consumeFunToken.nextState;
+        let tryFunctionDeclaration = functionDeclaration("function", currentState);
+
+        if (tryFunctionDeclaration.nextState.errors.length > 0) {
+            return {
+                statement: null,
+                nextState: {...synchronize(tryFunctionDeclaration.nextState).nextState},
+            };
+        }
+        return tryFunctionDeclaration;
+    }
+
+    let varDeclarationMatch = match([tokenType.VAR], currentState);
+    if (varDeclarationMatch.success) {
+        let consumeVarToken = consume(tokenType.VAR, "Expecting 'var' token.", currentState);
+
+        if (!consumeVarToken.success)
+            return {
+                statement: null,
+                nextState: consumeVarToken.nextState,
+            };
+
+        currentState = consumeVarToken.nextState;
+        let tryVariableDeclaration = varDeclaration(currentState);
+
+        if (tryVariableDeclaration.nextState.errors.length > 0) {
+            return synchronize(currentState);
+        }
+        return tryVariableDeclaration;
+    }
+
+    return statement(currentState);
+}
+
+function functionDeclaration(kind ,state) {
+    let currentState = state;
+    let consumeIdentifier = consume(tokenType.IDENTIFIER, "Expect " + kind + " name.", currentState);
+    if (!consumeIdentifier.success){
+        return {
+            statement: null,
+            nextState: consumeIdentifier.nextState,
+        };
+    }
+    currentState = consumeIdentifier.nextState;
+
+    let nameToken = previous(currentState);
+    let consumeLeftParen = consume(tokenType.LEFT_PAREN, "Expect '(' after " + kind + " name.", currentState);
+    if (!consumeLeftParen.success){
+        return {
+            statement: null,
+            nextState: consumeLeftParen.nextState
+        };
+    }
+    currentState = consumeLeftParen.nextState;
+
     let parameters = [];
 
-    if (!check(tokenType.RIGHT_PAREN, curr_idx)){
+    if (!check(tokenType.RIGHT_PAREN, currentState)){
         do {
             if (parameters.length >= 255){
-                let curr_token = peek(curr_idx);
+                let curr_token = peek(currentState);
                 error(curr_token.line, "ParseError", "Can't have more than 255 parameters.");
             }
-            curr_idx = consume(tokenType.IDENTIFIER, "Expect parameter name.", curr_idx);
-            parameters.push(previous(curr_idx));
-            if (!match([tokenType.COMMA], curr_idx)){
+
+            let consumeIdentifier = consume(tokenType.IDENTIFIER, "Expect parameter name.", currentState);
+            if (!consumeIdentifier.success){
+                return {
+                    statement: null,
+                    nextState: consumeIdentifier.nextState,
+                };
+            }
+            currentState = consumeIdentifier.nextState;
+
+            parameters.push(previous(currentState));
+            if (!match([tokenType.COMMA], currentState).success){
                 break;
             }
-            curr_idx = consume(tokenType.COMMA, "", curr_idx);
+            currentState = consume(tokenType.COMMA, "", currentState).nextState;
         } while(true);
     }
 
-    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after parameters.", curr_idx);
-    curr_idx = consume(tokenType.LEFT_BRACE, "Expect '{' before " + kind + " body." ,curr_idx);
-    let body = blockStatement(curr_idx);
-    curr_idx = body.curr_idx;
+    let consumeRightParen = consume(tokenType.RIGHT_PAREN, "Expect ')' after parameters.", currentState);
+    if (!consumeRightParen.success){
+        return {
+            statement: null,
+            nextState: consumeRightParen.nextState,
+        };
+    }
+    currentState = consumeRightParen.nextState;
+
+    let consumeLeftBrace = consume(tokenType.LEFT_BRACE, "Expect '{' before " + kind + " body." ,currentState);
+    if (!consumeLeftBrace.success){
+        return {
+            statement: null,
+            nextState: consumeLeftBrace.nextState,
+        };
+    }
+    currentState = consumeLeftBrace.nextState;
+
+    let body = blockStatement(currentState);
+    currentState = body.nextState;
     return {
         statement: {
             statementType: statementsTypes.STATEMENT_FUNC,
@@ -84,132 +168,201 @@ function functionDeclaration(kind ,curr_idx) {
             parameters: parameters,
             body: body.statement,
         },
-        curr_idx : curr_idx,
+        nextState : currentState,
     }
-
 }
 
 
-function varDeclaration(curr_idx) {
-    if (!match([tokenType.IDENTIFIER], curr_idx)) {
-        throw new ParseError(peek(curr_idx), "Expected IDENTIFIER to be identifiable.");
+function varDeclaration(state) {
+    let currentState = state;
+    let identifierMatch = match([tokenType.IDENTIFIER], currentState);
+    if (!identifierMatch.success) {
+        currentState = {...currentState, errors: [...currentState.errors, new ParseError(peek(currentState), "Expected IDENTIFIER to be identifiable.")]}
+        return {statement: null, currentState};
     }
 
-    let name = tokens[curr_idx];
-    curr_idx = consume(tokenType.IDENTIFIER, "" ,curr_idx);
+    let name = currentState.tokens[currentState.currentIdx];
+    currentState = consume(tokenType.IDENTIFIER, "" ,currentState).nextState;
 
     let initializer = null;
-    if (match([tokenType.EQUAL], curr_idx)) {
-        curr_idx = consume(tokenType.EQUAL, "" , curr_idx);
-        initializer = expression(curr_idx);
-        curr_idx = initializer.curr_idx;
+    let equalMatch = match([tokenType.EQUAL], currentState);
+    if (equalMatch.success) {
+        currentState = consume(tokenType.EQUAL, "" , currentState).nextState;
+        initializer = expression(currentState);
+        currentState = initializer.nextState;
     }
 
-    curr_idx = consume(tokenType.SEMICOLON, "Expect ';' after variable declaration.", curr_idx);
+    let consumeSemicolon = consume(tokenType.SEMICOLON, "Expect ';' after variable declaration.", currentState);
+    if (!consumeSemicolon.success){
+        return {
+            statement: null,
+            nextState: consumeSemicolon.nextState,
+        };
+    }
+    currentState = consumeSemicolon.nextState;
 
     return {
         statement : {
             statementType : statementsTypes.STATEMENT_VAR_DEC,
-            exprValue : initializer !== null ? initializer.expr : null,
+            exprValue : initializer?.expr ?? null,
             nameToken : name,
         },
-        curr_idx : curr_idx
+        nextState : currentState
     }
 }
 
 
-function statement(curr_idx) {
-    if (match([tokenType.PRINT], curr_idx)) {
-        curr_idx = consume(tokenType.PRINT, "Expected Print statement.", curr_idx);
-        return printStatement(curr_idx);
+function statement(state) {
+    let currentState = state;
+
+    let printMatch = match([tokenType.PRINT], currentState);
+    if (printMatch.success) {
+        currentState = consume(tokenType.PRINT, "Expected Print statement.", currentState).nextState;
+        return printStatement(currentState);
     }
-    if (match([tokenType.RETURN], curr_idx)){
-        curr_idx = consume(tokenType.RETURN, "Expected Return statement.", curr_idx);
-        return returnStatement(curr_idx);
+
+    let  returnMatch = match([tokenType.RETURN], currentState);
+    if (returnMatch.success){
+        currentState = consume(tokenType.RETURN, "Expected Return statement.", currentState).nextState;
+        return returnStatement(currentState);
     }
-    if (match([tokenType.LEFT_BRACE], curr_idx)){
-        curr_idx = consume(tokenType.LEFT_BRACE, "Expected beginning of a block.", curr_idx);
-        return blockStatement(curr_idx);
+
+    let leftBMatch = match([tokenType.LEFT_BRACE], currentState);
+    if (leftBMatch.success){
+        currentState = consume(tokenType.LEFT_BRACE, "Expected beginning of a block.", currentState).nextState;
+        return blockStatement(currentState);
     }
-    if (match([tokenType.IF], curr_idx)) {
-        curr_idx = consume(tokenType.IF, "Expected if statement.", curr_idx);
-        return ifStatement(curr_idx);
+
+    let ifMatch = match([tokenType.IF], currentState);
+    if (ifMatch.success) {
+        currentState = consume(tokenType.IF, "Expected if statement.", currentState).nextState;
+        return ifStatement(currentState);
     }
-    if (match([tokenType.WHILE], curr_idx)){
-        curr_idx = consume(tokenType.WHILE, "Expected while statement.", curr_idx);
-        return whileStatement(curr_idx);
+
+    let whileMatch = match([tokenType.WHILE], currentState);
+    if (whileMatch.success){
+        currentState = consume(tokenType.WHILE, "Expected while statement.", currentState).nextState;
+        return whileStatement(currentState);
     }
-    if (match([tokenType.FOR], curr_idx)){
-        curr_idx = consume(tokenType.FOR, "Expect for statement.", curr_idx);
-        return forStatement(curr_idx);
+
+    let forMatch = match([tokenType.FOR], currentState);
+    if (forMatch.success){
+        currentState = consume(tokenType.FOR, "Expect for statement.", currentState).nextState;
+        return forStatement(currentState);
     }
-    return expressionStatement(curr_idx);
+    return expressionStatement(currentState);
 }
 
-function printStatement(curr_idx) {
-    const value = expression(curr_idx);
-    curr_idx = value.curr_idx;
-    if (!isAtEnd(curr_idx))
-        curr_idx = consume(tokenType.SEMICOLON, "Expected ';' after expression.", curr_idx);
+function printStatement(state) {
+    let currentState = state;
+    const value = expression(currentState);
+    currentState = value.nextState;
+    if (!isAtEnd(currentState)) {
+        let consumeSemicolon = consume(tokenType.SEMICOLON, "Expected ';' after expression.", currentState);
+        if (!consumeSemicolon.success){
+            return {
+                statement: null,
+                nextState: consumeSemicolon.nextState,
+            };
+        }
+        currentState = consumeSemicolon.nextState;
+    }
     return {
         statement: {
             statementType: statementsTypes.STATEMENT_PRINT,
             exprValue: value.expr,
         },
-        curr_idx: curr_idx,
+        nextState: currentState,
     }
 }
 
-function returnStatement(curr_idx){
-    let keyword = previous(curr_idx);
+function returnStatement(state){
+    let currentState = state;
+    let keyword = previous(currentState);
     let value = null;
 
-    if (!check(tokenType.SEMICOLON, curr_idx)){
-        value = expression(curr_idx);
-        curr_idx = value.curr_idx;
+    if (!check(tokenType.SEMICOLON, currentState)){
+        value = expression(currentState);
+        currentState = value.nextState;
     }
 
-    curr_idx = consume(tokenType.SEMICOLON, "Expect ';' after return value." ,curr_idx);
+    let consumeSemicolon = consume(tokenType.SEMICOLON, "Expect ';' after return value." ,currentState);
+    if (!consumeSemicolon.success){
+        return {
+            statement: null,
+            nextState: consumeSemicolon.nextState,
+        };
+    }
+    currentState = consumeSemicolon.nextState;
+
     return {
         statement: {
             statementType : statementsTypes.STATEMENT_RETURN,
             exprValue : value?.expr ?? null,
         },
-        curr_idx: curr_idx,
+        nextState: currentState,
     }
 }
 
 
-function blockStatement(curr_idx){
+function blockStatement(state){
+    let currentState = state;
     const statements = [];
-    while(!check(tokenType.RIGHT_BRACE, curr_idx) && !isAtEnd(curr_idx)) {
-        const current_statement = declaration(curr_idx);
+    while(!check(tokenType.RIGHT_BRACE, currentState) && !isAtEnd(currentState)) {
+        const current_statement = declaration(currentState);
         statements.push(current_statement.statement);
-        curr_idx = current_statement.curr_idx;
+        currentState = current_statement.nextState;
     }
-    curr_idx = consume(tokenType.RIGHT_BRACE, "Expect '}' after block." , curr_idx);
+
+    let consumeRightBrace = consume(tokenType.RIGHT_BRACE, "Expect '}' after block." , currentState);
+    if (!consumeRightBrace.success){
+        return {
+            statement: null,
+            nextState: consumeRightBrace.nextState,
+        };
+    }
+    currentState = consumeRightBrace.nextState;
+
     return {
         statement: {
             statementType: statementsTypes.STATEMENT_BLOCK,
             statements: statements,
         },
-        curr_idx : curr_idx
+        nextState : currentState
     };
 }
 
-function ifStatement(curr_idx){
-    curr_idx = consume(tokenType.LEFT_PAREN, "Expect '(' after 'if'." , curr_idx);
-    const condition_expr = expression(curr_idx);
-    curr_idx = condition_expr.curr_idx;
-    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after if condition.",curr_idx);
+function ifStatement(state){
+    let currentState = state;
 
-    const thenBranch = statement(curr_idx);
-    curr_idx = thenBranch.curr_idx;
+    let consumeLeftParen = consume(tokenType.LEFT_PAREN, "Expect '(' after 'if'." , currentState);
+    if (!consumeLeftParen.success){
+        return {
+            statement: null,
+            nextState: consumeLeftParen.nextState,
+        };
+    }
+    currentState = consumeLeftParen.nextState;
+
+    const condition_expr = expression(currentState);
+    currentState = condition_expr.nextState;
+
+    let consumeRightParen = consume(tokenType.RIGHT_PAREN, "Expect ')' after if condition.",currentState);
+    if (!consumeRightParen.success){
+        return {
+            statement: null,
+            nextState: consumeRightParen.nextState,
+        };
+    }
+    currentState = consumeRightParen.nextState;
+
+    const thenBranch = statement(currentState);
+    currentState = thenBranch.nextState;
     let elseBranch = null;
-    if (match([tokenType.ELSE], curr_idx)) {
-        curr_idx = consume(tokenType.ELSE, "Expect else branch.", curr_idx);
-        elseBranch = statement(curr_idx);
-        curr_idx = elseBranch.curr_idx;
+    if (match([tokenType.ELSE], currentState).success) {
+        currentState = consume(tokenType.ELSE, "Expect else branch.", currentState).nextState;
+        elseBranch = statement(currentState);
+        currentState = elseBranch.nextState;
     }
 
     return {
@@ -219,77 +372,121 @@ function ifStatement(curr_idx){
             thenBranch : thenBranch,
             elseBranch : elseBranch,
         },
-        curr_idx : curr_idx
+        nextState : currentState
     }
-
 }
 
-function whileStatement(curr_idx){
-    curr_idx = consume(tokenType.LEFT_PAREN, "Expect '(' after 'if'." , curr_idx);
-    const condition_expr = expression(curr_idx);
-    curr_idx = condition_expr.curr_idx;
-    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after if condition.",curr_idx);
+function whileStatement(state){
+    let currentState = state;
 
-    const body = statement(curr_idx);
-    curr_idx = body.curr_idx;
+    let consumeLeftParen = consume(tokenType.LEFT_PAREN, "Expect '(' after 'if'." , currentState);
+    if (!consumeLeftParen.success){
+        return {
+            statement: null,
+            nextState: consumeLeftParen.nextState,
+        };
+    }
+    currentState = consumeLeftParen.nextState;
+
+    const condition_expr = expression(currentState);
+    currentState = condition_expr.nextState;
+
+    let consumeRightParen = consume(tokenType.RIGHT_PAREN, "Expect ')' after if condition.",currentState);
+    if (!consumeRightParen.success){
+        return {
+            statement: null,
+            nextState: consumeRightParen.nextState,
+        };
+    }
+    currentState = consumeRightParen.nextState;
+
+    const body = statement(currentState);
+    currentState = body.nextState;
     return {
         statement : {
             statementType: statementsTypes.STATEMENT_WHILE,
             condition_expr : condition_expr,
             body : body,
         },
-        curr_idx : curr_idx
+        nextState : currentState
     }
 }
 
-function expressionStatement(curr_idx) {
-    const value = expression(curr_idx);
-    curr_idx = value.curr_idx;
-    if (!isAtEnd(curr_idx))
-        curr_idx = consume(tokenType.SEMICOLON, "Expected ';' after expression.", curr_idx);
+function expressionStatement(state) {
+    let currentState = state;
+    const value = expression(currentState);
+    currentState = value.nextState;
+    if (!isAtEnd(currentState))
+        currentState = consume(tokenType.SEMICOLON, "Expected ';' after expression.", currentState).nextState;
     return {
         statement: {
             statementType: statementsTypes.STATEMENT_EXPR,
             exprValue: value.expr
         },
-        curr_idx: curr_idx,
+        nextState: currentState,
     }
 }
 
-function forStatement(curr_idx){
-    curr_idx = consume(tokenType.LEFT_PAREN, "Expect '(' after 'for'." , curr_idx);
+function forStatement(state){
+    let currentState = state;
+
+    let consumeLeftParen = consume(tokenType.LEFT_PAREN, "Expect '(' after 'for'." , currentState);
+    if (!consumeLeftParen.success){
+        return {
+            statement: null,
+            nextState: consumeLeftParen.nextState,
+        };
+    }
+    currentState = consumeLeftParen.nextState;
 
     let initializer;
-    if (match([tokenType.SEMICOLON], curr_idx)) {
-        curr_idx = consume(tokenType.SEMICOLON, "", curr_idx);
+    let semicolonMatch = match([tokenType.SEMICOLON], currentState);
+    let varMatch = match([tokenType.VAR], currentState);
+    if (semicolonMatch.success) {
+        currentState = consume(tokenType.SEMICOLON, "", currentState).nextState;
         initializer = null;
-    } else if (match([tokenType.VAR], curr_idx)) {
-        curr_idx = consume(tokenType.VAR, "", curr_idx);
-        initializer = varDeclaration(curr_idx);
-        curr_idx = initializer.curr_idx;
+    } else if (varMatch.success) {
+        currentState = consume(tokenType.VAR, "", currentState).nextState;
+        initializer = varDeclaration(currentState);
+        currentState = initializer.nextState;
 
     } else {
-        initializer = expressionStatement(curr_idx);
-        curr_idx = initializer.curr_idx;
+        initializer = expressionStatement(currentState);
+        currentState = initializer.nextState;
     }
 
     let condition_expr = null;
-    if (!check(tokenType.SEMICOLON, curr_idx)) {
-        condition_expr = expression(curr_idx);
-        curr_idx = condition_expr.curr_idx;
+    if (!check(tokenType.SEMICOLON, currentState)) {
+        condition_expr = expression(currentState);
+        currentState = condition_expr.nextState;
     }
 
-    curr_idx = consume(tokenType.SEMICOLON, "Expect ';' after loop condition.", curr_idx);
+    let consumeSemicolon = consume(tokenType.SEMICOLON, "Expect ';' after loop condition.", currentState);
+    if (!consumeSemicolon.success){
+        return {
+            statement: null,
+            nextState: consumeSemicolon.nextState,
+        };
+    }
+    currentState = consumeSemicolon.nextState;
 
     let increment_expr = null;
-    if (!check(tokenType.RIGHT_PAREN, curr_idx)) {
-        increment_expr = expression(curr_idx);
-        curr_idx = increment_expr.curr_idx;
+    if (!check(tokenType.RIGHT_PAREN, currentState)) {
+        increment_expr = expression(currentState);
+        currentState = increment_expr.nextState;
     }
 
-    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after for clauses.", curr_idx);
-    let body = statement(curr_idx);
-    curr_idx = body.curr_idx;
+    let consumeRightParen = consume(tokenType.RIGHT_PAREN, "Expect ')' after for clauses.", currentState);
+    if (!consumeRightParen.success){
+        return {
+            statement: null,
+            nextState: consumeRightParen.nextState
+        };
+    }
+    currentState = consumeRightParen.nextState;
+
+    let body = statement(currentState);
+    currentState = body.nextState;
 
     if (increment_expr !== null) {
         body = {
@@ -302,7 +499,7 @@ function forStatement(curr_idx){
                     }
                 ],
             },
-            curr_idx : curr_idx
+            nextState : currentState
         };
     }
 
@@ -319,7 +516,7 @@ function forStatement(curr_idx){
             condition_expr: condition_expr,
             body: body,
         } ,
-        curr_idx : curr_idx
+        nextState : currentState
     };
 
     if (initializer !== null){
@@ -328,25 +525,25 @@ function forStatement(curr_idx){
                 statementType: statementsTypes.STATEMENT_BLOCK,
                 statements: [initializer.statement, body.statement],
             },
-            curr_idx: curr_idx
+            nextState: currentState
         }
     }
 
     return body;
-
 }
 
-function synchronize(curr_idx) {
-    if (isAtEnd(curr_idx)) {
-        return curr_idx;
+function synchronize(state) {
+    let currentState = state;
+    if (isAtEnd(currentState)) {
+        return {nextState: currentState};
     }
 
-    curr_idx++;
+    currentState.currentIdx++;
 
-    while (!isAtEnd(curr_idx)) {
-        if (previous(curr_idx).type === tokenType.SEMICOLON) return curr_idx;
+    while (!isAtEnd(currentState)) {
+        if (previous(currentState).type === tokenType.SEMICOLON) return {nextState: currentState};
 
-        switch (peek(curr_idx).type) {
+        switch (peek(currentState).type) {
             case tokenType.CLASS:
             case tokenType.FUNCTION:
             case tokenType.VAR:
@@ -355,29 +552,31 @@ function synchronize(curr_idx) {
             case tokenType.WHILE:
             case tokenType.PRINT:
             case tokenType.RETURN:
-                return curr_idx;
+                return {nextState: currentState};
         }
 
-        curr_idx++;
+        currentState.currentIdx++;
     }
 
-    return curr_idx;
+    return {nextState: currentState};
 }
 
-function expression(curr_idx) {
-    return assignment(curr_idx);
+function expression(state) {
+    return assignment(state);
 }
 
-function assignment(curr_idx) {
-    const expression = or(curr_idx);
-    curr_idx = expression.curr_idx;
+function assignment(state) {
+    let currentState = state;
+    const expression = or(currentState);
+    currentState = expression.nextState;
 
-    if (match([tokenType.EQUAL], curr_idx)) {
-        const equals_idx = curr_idx;
-        curr_idx = consume(tokenType.EQUAL, "", curr_idx);
+    let equalMatch = match([tokenType.EQUAL], currentState);
+    if (equalMatch.success) {
+        const equals_idx = currentState.currentIdx;
+        currentState = consume(tokenType.EQUAL, "", currentState).nextState;
 
-        const value = assignment(curr_idx);
-        curr_idx = value.curr_idx;
+        const value = assignment(currentState);
+        currentState = value.nextState;
 
         if (expression?.expr?.name === 'variable'){
             return {
@@ -386,24 +585,28 @@ function assignment(curr_idx) {
                     valueExpr : value.expr,
                     nameExpr : expression.expr,
                 },
-                curr_idx : curr_idx
+                nextState : currentState
             };
         }
 
-        error(tokens[equals_idx].line, errorType.INVALID_ASSIGNMENT_TARGET);
+        error(currentState.tokens[equals_idx].line, errorType.INVALID_ASSIGNMENT_TARGET);
     }
     return expression;
 }
 
-function or(curr_idx){
-    let expression = and(curr_idx);
-    curr_idx = expression.curr_idx;
+function or(state){
+    let currentState = state;
+    let expression = and(currentState);
+    currentState = expression.nextState;
 
-    while(match([tokenType.OR], curr_idx)){
-        curr_idx = consume(tokenType.OR, "OR", curr_idx);
-        const operator = previous(curr_idx);
-        const right = and(curr_idx);
-        curr_idx = right.curr_idx;
+    while(true){
+        let orMatch = match([tokenType.OR], currentState);
+        if (!orMatch.success)
+            break;
+        currentState = consume(tokenType.OR, "OR", currentState).nextState;
+        const operator = previous(currentState);
+        const right = and(currentState);
+        currentState = right.nextState;
         expression = {
             expr : {
                     name : "logical",
@@ -411,22 +614,26 @@ function or(curr_idx){
                     operator : operator,
                     right : right.expr,
             },
-            curr_idx : curr_idx
+            nextState : currentState
         }
     }
 
     return expression;
 }
 
-function and(curr_idx){
-    let expression = equality(curr_idx);
-    curr_idx = expression.curr_idx;
+function and(state){
+    let currentState = state;
+    let expression = equality(currentState);
+    currentState = expression.nextState;
 
-    while(match([tokenType.AND], curr_idx)){
-        curr_idx = consume(tokenType.AND, "AND", curr_idx);
-        const operator = previous(curr_idx);
-        const right = equality(curr_idx);
-        curr_idx = right.curr_idx;
+    while(true){
+        let andMatch = match([tokenType.AND], currentState);
+        if (!andMatch.success)
+            break;
+        currentState = consume(tokenType.AND, "AND", currentState).nextState;
+        const operator = previous(currentState);
+        const right = equality(currentState);
+        currentState = right.nextState;
         expression = {
             expr : {
                 name : "logical",
@@ -434,245 +641,254 @@ function and(curr_idx){
                 operator : operator,
                 right : right.expr,
             },
-            curr_idx: curr_idx
+            nextState: currentState
         }
     }
     return expression;
 }
 
 
-function equality(curr_idx) {
-    try {
-        let {expr, curr_idx: newIdx} = comparison(curr_idx);
-        curr_idx = newIdx;
+function equality(state) {
+    let currentState = state;
+    let leftComparisonExpr = comparison(currentState);
+    currentState = leftComparisonExpr.nextState;
 
-        while (match([tokenType.BANG_EQUAL, tokenType.EQUAL_EQUAL], curr_idx)) {
-            curr_idx++;
-            const operator = previous(curr_idx);
 
-            try {
-                const {expr: right, curr_idx: next_idx} = comparison(curr_idx);
-                curr_idx = next_idx;
-                expr = {
-                    name: "binary",
-                    operator: operator,
-                    leftExpression: expr,
-                    rightExpression: right,
+    while(true) {
+        let bangEqual_equalEqual_match = match([tokenType.BANG_EQUAL, tokenType.EQUAL_EQUAL], currentState);
+        if (!bangEqual_equalEqual_match.success)
+            break;
+
+        currentState.currentIdx++;
+        const operator = previous(currentState);
+
+
+        let rightComparisonExpr = comparison(currentState);
+        currentState = rightComparisonExpr.nextState;
+        leftComparisonExpr.expr = {
+            name: "binary",
+            operator: operator,
+            leftExpression: leftComparisonExpr.expr,
+            rightExpression: rightComparisonExpr.expr,
+        };
+
+        if (currentState.errors.length) {
+            if (!isAtEnd(currentState))
+                currentState = synchronize(currentState).nextState;
+            if (leftComparisonExpr.expr.name !== "error") {
+                leftComparisonExpr.expr = {
+                    name: "error",
+                    value: null,
+                    expression: leftComparisonExpr.expr,
+                    message: `Missing right operand for '${operator.text}' operator`
                 };
-            } catch (e) {
-                if (e instanceof ParseError) {
-                    // Missing right operand - create error node and synchronize
-                    if (!isAtEnd(curr_idx))
-                        curr_idx = synchronize(curr_idx);
-                    expr = {
-                        name: "error",
-                        value: null,
-                        expression: expr,
-                        message: `Missing right operand for '${operator.text}' operator`
-                    };
-                    break; // Exit the loop since we're in an error state
-                }
-                throw e;
             }
+            currentState.errors = [...currentState.errors, {name: "error", value: null, expression: leftComparisonExpr.expr, message: `Missing right operand for '${operator.text}' operator`}];
+            break;
         }
+    }
+    let returnExpr = leftComparisonExpr.expr;
+    return {expr: returnExpr, nextState: currentState};
+}
 
-        return {expr, curr_idx};
-    } catch (e) {
-        if (e instanceof ParseError) {
-            if (!isAtEnd(curr_idx))
-                curr_idx = synchronize(curr_idx);
+function comparison(state) {
+    let currentState = state;
+
+    let leftTermExpr = term(currentState);
+    currentState = leftTermExpr.nextState;
+
+    if (currentState.errors.length) {
+        currentState = synchronize(currentState).nextState;
+        if (leftTermExpr.expr.name !== "error") {
+            leftTermExpr.expr = {
+                name: "error",
+                value: null,
+                expression: leftTermExpr.expr,
+                message: `Missing left operand`
+            };
+        }
+        currentState.errors = [...currentState.errors, {name: "error", value: null, expression: leftTermExpr.expr, message: `Missing left operand`}];
+        return {expr: leftTermExpr.expr, nextState: currentState};
+    }
+
+    while (match([tokenType.GREATER, tokenType.GREATER_EQUAL, tokenType.LESS, tokenType.LESS_EQUAL,], currentState).success) {
+        currentState.currentIdx++;
+        const operator = previous(currentState);
+
+        let rightTermExpr = term(currentState);
+        currentState = rightTermExpr.nextState;
+        leftTermExpr.expr = {
+            name: "binary",
+            operator: operator,
+            leftExpression: leftTermExpr.expr,
+            rightExpression: rightTermExpr.expr,
+        };
+
+        if (currentState.errors.length) {
+            currentState = synchronize(currentState).nextState;
+            if (leftTermExpr.expr.name !== "error") {
+                leftTermExpr.expr = {
+                    name: "error",
+                    value: null,
+                    expression: leftTermExpr.expr,
+                    message: `Missing right operand for '${operator.text}' operator`
+                };
+            }
+            currentState.errors = [...currentState.errors, {name: "error", value: null, expression: leftTermExpr.expr, message: `Missing right operand for '${operator.text}' operator`}];
+            break;
+        }
+    }
+    let returnExpr = leftTermExpr.expr;
+    return {expr: returnExpr, nextState: currentState};
+}
+
+function term(state) {
+    let currentState = state;
+
+    let leftFactorExpr = factor(currentState);
+    currentState = leftFactorExpr.nextState;
+
+    if (currentState.errors.length) {
+        currentState = synchronize(currentState).nextState;
+        const lastError = currentState.errors[currentState.errors.length - 1];
+        if (leftFactorExpr.expr?.name !== "error") {
+            leftFactorExpr.expr = {
+                name: "error",
+                value: null,
+                expression: leftFactorExpr.expr,
+                message: lastError.message
+            };
+        }
+        return {expr: leftFactorExpr.expr, nextState: currentState};
+    }
+
+    while (match([tokenType.MINUS, tokenType.PLUS], currentState).success) {
+        currentState.currentIdx++;
+        const operator = previous(currentState);
+
+
+        let rightFactorExpr = factor(currentState);
+        currentState = rightFactorExpr.nextState;
+        leftFactorExpr.expr = {
+            name: "binary",
+            operator: operator,
+            leftExpression: leftFactorExpr.expr,
+            rightExpression: rightFactorExpr.expr,
+        };
+
+        if (currentState.errors.length) {
+            // Missing right operand - create error node and synchronize
+            currentState = synchronize(currentState).nextState;
+            if (leftFactorExpr.expr?.name !== "error") {
+                leftFactorExpr.expr = {
+                    name: "error",
+                    value: null,
+                    expression: leftFactorExpr.expr,
+                    message: `Missing right operand for '${operator.text}' operator`
+                };
+            }
+            currentState.errors = [...currentState.errors, {name: "error", value: null, expression: leftFactorExpr.expr, message: `Missing right operand for '${operator.text}' operator`}];
+            break; // Exit the loop since we're in an error state
+        }
+    }
+    return {expr: leftFactorExpr.expr, nextState: currentState};
+}
+
+function factor(state) {
+    let currentState = state;
+
+    let leftUnaryExpr = unary(currentState);
+    currentState = leftUnaryExpr.nextState;
+
+    if (currentState.errors.length) {
+        currentState = synchronize(currentState).nextState;
+        const lastError = currentState.errors[currentState.errors.length - 1];
+        if (leftUnaryExpr.expr?.name !== "error") {
+            leftUnaryExpr.expr = {
+                name: "error",
+                value: null,
+                expression: leftUnaryExpr.expr,
+                message: lastError.message
+            };
+        }
+        return {expr: leftUnaryExpr.expr, nextState: currentState};
+    }
+
+    while (match([tokenType.SLASH, tokenType.STAR], currentState).success) {
+        currentState.currentIdx++;
+        const operator = previous(currentState);
+
+
+        let rightUnaryExpr = unary(currentState);
+        currentState = rightUnaryExpr.nextState;
+        leftUnaryExpr.expr = {
+            name: "binary",
+            operator: operator,
+            leftExpression: leftUnaryExpr.expr,
+            rightExpression: rightUnaryExpr.expr,
+        };
+
+        if (currentState.errors.length) {
+            currentState = synchronize(currentState).nextState;
+            if (leftUnaryExpr.expr?.name !== "error") {
+                leftUnaryExpr.expr = {
+                    name: "error",
+                    value: null,
+                    expression: leftUnaryExpr.expr,
+                    message: `Missing right operand for '${operator.text}' operator`
+                };
+            }
+            currentState.errors = [...currentState.errors, {name: "error", value: null, expression: leftUnaryExpr.expr, message: `Missing right operand for '${operator.text}' operator`}];
+            break; // Exit the loop since we're in an error state
+        }
+    }
+
+    return {expr: leftUnaryExpr.expr, nextState: currentState};
+}
+
+function unary(state) {
+    let currentState = state;
+    if (match([tokenType.BANG, tokenType.MINUS], currentState).success) {
+        currentState.currentIdx++;
+        const operator = previous(currentState);
+
+
+        let rightUnaryExpr= unary(currentState);
+        currentState = rightUnaryExpr.nextState;
+
+        if (currentState.errors.length) {
+            currentState = synchronize(currentState).nextState;
             return {
-                expr: {name: "error", value: null, message: e.message},
-                curr_idx
+                expr: {
+                    name: "error",
+                    value: null,
+                    expression: currentState.errors[currentState.errors.length - 1].expression,
+                    message: `Missing operand for ${operator.text} operator`
+                },
+                nextState: currentState
             };
         }
-        throw e;
+
+        rightUnaryExpr.expr = {
+            name: "unary",
+            operator: operator,
+            expression: rightUnaryExpr.expr,
+        };
+        return {expr: rightUnaryExpr.expr, nextState: currentState};
     }
+    return call(currentState);
 }
 
-function comparison(curr_idx) {
-    try {
-        let {expr, curr_idx: new_idx} = term(curr_idx);
-        curr_idx = new_idx;
-
-        while (match([tokenType.GREATER, tokenType.GREATER_EQUAL, tokenType.LESS, tokenType.LESS_EQUAL,], curr_idx)) {
-            curr_idx++;
-            const operator = previous(curr_idx);
-
-            try {
-                const {expr: right, curr_idx: next_idx} = term(curr_idx);
-                curr_idx = next_idx;
-                expr = {
-                    name: "binary",
-                    operator: operator,
-                    leftExpression: expr,
-                    rightExpression: right,
-                };
-            } catch (e) {
-                if (e instanceof ParseError) {
-                    // Missing right operand - create error node and synchronize
-                    curr_idx = synchronize(curr_idx);
-                    expr = {
-                        name: "error",
-                        value: null,
-                        expression: expr,
-                        message: `Missing right operand for '${operator.text}' operator`
-                    };
-                    break; // Exit the loop since we're in an error state
-                }
-                throw e;
-            }
-        }
-
-        return {expr, curr_idx};
-    } catch (e) {
-        if (e instanceof ParseError) {
-            curr_idx = synchronize(curr_idx);
-            return {
-                expr: {name: "error", value: null, message: e.message},
-                curr_idx
-            };
-        }
-        throw e;
-    }
-}
-
-function term(curr_idx) {
-    try {
-        let {expr, curr_idx: new_idx} = factor(curr_idx);
-        curr_idx = new_idx;
-
-        while (match([tokenType.MINUS, tokenType.PLUS], curr_idx)) {
-            curr_idx++;
-            const operator = previous(curr_idx);
-
-            try {
-                let {expr: right, curr_idx: new_idx} = factor(curr_idx);
-                curr_idx = new_idx;
-                expr = {
-                    name: "binary",
-                    operator: operator,
-                    leftExpression: expr,
-                    rightExpression: right,
-                };
-            } catch (e) {
-                if (e instanceof ParseError) {
-                    // Missing right operand - create error node and synchronize
-                    curr_idx = synchronize(curr_idx);
-                    expr = {
-                        name: "error",
-                        value: null,
-                        expression: expr,
-                        message: `Missing right operand for '${operator.text}' operator`
-                    };
-                    break; // Exit the loop since we're in an error state
-                }
-                throw e;
-            }
-        }
-
-        return {expr, curr_idx};
-    } catch (e) {
-        if (e instanceof ParseError) {
-            curr_idx = synchronize(curr_idx);
-            return {
-                expr: {name: "error", value: null, message: e.message},
-                curr_idx
-            };
-        }
-        throw e;
-    }
-}
-
-function factor(curr_idx) {
-    try {
-        let {expr, curr_idx: new_idx} = unary(curr_idx);
-        curr_idx = new_idx;
-
-        while (match([tokenType.SLASH, tokenType.STAR], curr_idx)) {
-            curr_idx++;
-            const operator = previous(curr_idx);
-
-            try {
-                let {expr: right, curr_idx: new_idx} = unary(curr_idx);
-                curr_idx = new_idx;
-                expr = {
-                    name: "binary",
-                    operator: operator,
-                    leftExpression: expr,
-                    rightExpression: right,
-                };
-            } catch (e) {
-                if (e instanceof ParseError) {
-                    // Missing right operand - create error node and synchronize
-                    curr_idx = synchronize(curr_idx);
-                    expr = {
-                        name: "error",
-                        value: null,
-                        expression: expr,
-                        message: `Missing right operand for '${operator.text}' operator`
-                    };
-                    break; // Exit the loop since we're in an error state
-                }
-                throw e;
-            }
-        }
-
-        return {expr, curr_idx};
-    } catch (e) {
-        if (e instanceof ParseError) {
-            curr_idx = synchronize(curr_idx);
-            return {
-                expr: {name: "error", value: null, message: e.message},
-                curr_idx
-            };
-        }
-        throw e;
-    }
-}
-
-function unary(curr_idx) {
-    if (match([tokenType.BANG, tokenType.MINUS], curr_idx)) {
-        curr_idx++;
-        const operator = previous(curr_idx);
-
-        try {
-            let {expr: right, curr_idx: new_idx} = unary(curr_idx);
-            curr_idx = new_idx;
-            let expr = {
-                name: "unary",
-                operator: operator,
-                expression: right,
-            };
-            return {expr, curr_idx};
-        } catch (e) {
-            if (e instanceof ParseError) {
-                curr_idx = synchronize(curr_idx);
-                return {
-                    expr: {
-                        name: "error",
-                        value: null,
-                        message: `Missing operand for ${operator.text} operator`
-                    },
-                    curr_idx
-                };
-            }
-            throw e;
-        }
-    }
-
-    return call(curr_idx);
-}
-
-function call(curr_idx) {
-    let expr = primary(curr_idx);
-    curr_idx = expr.curr_idx;
+function call(state) {
+    let currentState = state;
+    let expr = primary(currentState);
+    currentState = expr.nextState;
 
     while(true){
-        if (match([tokenType.LEFT_PAREN], curr_idx)){
-            curr_idx = consume(tokenType.LEFT_PAREN, "", curr_idx);
-            expr = finishCall(expr.expr ,curr_idx);
-            curr_idx = expr.curr_idx;
+        if (match([tokenType.LEFT_PAREN], currentState).success){
+            currentState = consume(tokenType.LEFT_PAREN, "", currentState).nextState;
+            expr = finishCall(expr.expr ,currentState);
+            currentState = expr.nextState;
         } else {
             break;
         }
@@ -681,27 +897,28 @@ function call(curr_idx) {
     return expr;
 }
 
-function finishCall(callee, curr_idx){
+function finishCall(callee, state){
+    let currentState = state;
     let callee_arguments = [];
-    if (!(check(tokenType.RIGHT_PAREN, curr_idx))){
+    if (!(check(tokenType.RIGHT_PAREN, currentState))){
         do {
             if (callee_arguments.length >= 255){
-                let curr_token = tokens[curr_idx];
+                let curr_token = currentState.tokens[currentState.currentIdx];
                 error(curr_token.line, "RunTimeError", "Can't have more than 255 arguments.");
             }
-            let argument = expression(curr_idx);
-            curr_idx = argument.curr_idx;
+            let argument = expression(currentState);
+            currentState = argument.nextState;
             callee_arguments.push(argument.expr);
-            if (!match([tokenType.COMMA], curr_idx)) {
+            if (!match([tokenType.COMMA], currentState).success) {
                 break;
             }
-            curr_idx = consume(tokenType.COMMA, "", curr_idx);
+            currentState = consume(tokenType.COMMA, "", currentState).nextState;
         } while(true);
     }
 
 
-    curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after arguments.", curr_idx);
-    let paren = previous(curr_idx);
+    currentState = consume(tokenType.RIGHT_PAREN, "Expect ')' after arguments.", currentState).nextState;
+    let paren = previous(currentState);
 
     return {
       expr: {
@@ -710,99 +927,98 @@ function finishCall(callee, curr_idx){
           paren: paren,
           callee_arguments: callee_arguments
       },
-      curr_idx : curr_idx
+      nextState : currentState
     };
 }
 
 
-function primary(curr_idx) {
-    if (match([tokenType.FALSE], curr_idx)) {
-        curr_idx++;
+function primary(state) {
+    let currentState = state;
+    if (match([tokenType.FALSE], currentState).success) {
+        currentState.currentIdx++;
         let expr = {
             name: "literal",
             value: false
         };
-        return {expr, curr_idx};
+        return {expr, nextState: currentState};
     }
-    if (match([tokenType.TRUE], curr_idx)) {
-        curr_idx++;
+    if (match([tokenType.TRUE], currentState).success) {
+        currentState.currentIdx++;
         let expr = {
             name: "literal",
             value: true
         };
-        return {expr, curr_idx};
+        return {expr, nextState: currentState};
     }
-    if (match([tokenType.NIL], curr_idx)) {
-        curr_idx++;
+    if (match([tokenType.NIL], currentState).success) {
+        currentState.currentIdx++;
         let expr = {
             name: "literal",
             value: null
         };
-        return {expr, curr_idx};
+        return {expr, nextState: currentState};
     }
 
-    if (match([tokenType.NUMBER, tokenType.STRING], curr_idx)) {
-        curr_idx++;
+    if (match([tokenType.NUMBER, tokenType.STRING], currentState).success) {
+        currentState.currentIdx++;
         let expr = {
             name: "literal",
-            value: previous(curr_idx).value,
+            value: previous(currentState).value,
         };
-        return {expr, curr_idx};
+        return {expr, nextState: currentState};
     }
 
-    if (match([tokenType.IDENTIFIER], curr_idx)) {
-        curr_idx++;
+    if (match([tokenType.IDENTIFIER], currentState).success) {
+        currentState.currentIdx++;
         let expr = {
             name: "variable",
-            value: previous(curr_idx).text
+            value: previous(currentState).text
         }
-        return {expr, curr_idx};
+        return {expr, nextState: currentState};
     }
 
-    if (match([tokenType.LEFT_PAREN], curr_idx)) {
-        curr_idx++;
-        let {expr, curr_idx: next_idx} = expression(curr_idx);
-        curr_idx = next_idx;
-        try {
-            curr_idx = consume(tokenType.RIGHT_PAREN, "Expect ')' after expression.", curr_idx);
-            expr = {name: "grouping", expression: expr};
-            return {expr, curr_idx};
-        } catch (e) {
-            if (e instanceof ParseError) {
-                // synchronize after error.
-                curr_idx = synchronize(curr_idx);
-                return {
-                    expr: {
-                        name: "error",
-                        value: null,
-                        expression: expr,
-                        message: "Missing closing parenthesis"
-                    },
-                    curr_idx
-                };
-            }
-            throw e;
+    if (match([tokenType.LEFT_PAREN], currentState).success) {
+        currentState.currentIdx++;
+        let expr = expression(currentState);
+        currentState = expr.nextState;
+
+        currentState = consume(tokenType.RIGHT_PAREN, "Expect ')' after expression.", currentState).nextState;
+
+        if (currentState.errors.length) {
+            // synchronize after error.
+            currentState = synchronize(currentState).nextState;
+            return {
+                expr: {
+                    name: "error",
+                    value: null,
+                    expression: expr,
+                    message: "Missing closing parenthesis"
+                },
+                nextState: currentState
+            };
         }
+
+        expr = {name: "grouping", expression: expr.expr};
+        return {expr: expr, nextState: currentState};
     }
 
     // didn't match any expression syntax.
-    const errorMessage = isAtEnd(curr_idx)
+    const errorMessage = isAtEnd(currentState)
         ? "Unexpected end of input."
-        : `Unexpected token '${peek(curr_idx).text}'.`;
+        : `Unexpected token '${peek(currentState).text}'.`;
 
-    const token = isAtEnd(curr_idx) ? previous(curr_idx) : peek(curr_idx);
-    parseError(token, errorMessage);
+    const token = isAtEnd(currentState) ? previous(currentState) : peek(currentState);
+    currentState.errors = [...currentState.errors, {name: "error", value: null, expression: token, message: `Error at line: ['${token.line}'] at token '${token.text}'`}]
 
-    // create an error node but continue parsing.
-    errorsCountParse++;
-    curr_idx = synchronize(curr_idx);
+    currentState = synchronize(currentState).nextState;
     return {
         expr: {
             name: "error",
             value: null,
+            expression: token,
             message: errorMessage
         },
-        curr_idx
+        nextState: currentState
     };
 }
 
@@ -816,41 +1032,41 @@ function addNativeFunctions(){
     });
 }
 
-function consume(type, message, curr_idx) {
-    if (check(type, curr_idx)) {
-        curr_idx++;
-        return curr_idx;
+function consume(type, message, state) {
+    if (check(type, state)) {
+        const nextState = { ...state, currentIdx: state.currentIdx + 1 };
+        return { success: true, nextState: nextState };
     }
 
-    const token = isAtEnd(curr_idx) ? previous(curr_idx) : peek(curr_idx);
-    parseError(token, message);
-    errorsCountParse++;
-
-    throw new ParseError(token, message);
+    // Failure case: return an error object.
+    const token = peek(state);
+    const error = { name: "error", value: null, expression: token, message: message };
+    const nextState = { ...state, errors: [...state.errors, error] };
+    return { success: false, nextState: nextState, error };
 }
 
-function match(types, curr_idx) {
-    for (let type of types) {
-        if (check(type, curr_idx)) {
-            return true;
+function match(types, state) {
+    for (let type of types) { //TODO: change loop to recursion.
+        if (check(type, state)) {
+            return {success: true, nextState: state};
         }
     }
-    return false;
+    return {success: false, nextState: state};
 }
 
-function check(type, curr_idx) {
-    if (isAtEnd(curr_idx)) return false;
-    return peek(curr_idx).type === type;
+function check(type, state) {
+    if (isAtEnd(state)) return false;
+    return peek(state).type === type;
 }
 
-function isAtEnd(curr_idx) {
-    return peek(curr_idx)?.type === tokenType.EOF;
+function isAtEnd(state) {
+    return peek(state)?.type === tokenType.EOF;
 }
 
-function previous(curr_idx) {
-    return tokens[curr_idx - 1];
+function previous(state) {
+    return state.tokens[state.currentIdx - 1];
 }
 
-function peek(curr_idx) {
-    return tokens[curr_idx];
+function peek(state) {
+    return state.tokens[state.currentIdx];
 }
